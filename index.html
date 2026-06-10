@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Paragliding Race Analyzer</title>
+    <link rel="icon" href="logo.png" type="image/png">
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <div class="app-container">
+        <!-- Sidebar for Controls and Pilot Stats -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <h1>Race Analyzer</h1>
+                <p>Upload IGC files to compare pilots.</p>
+            </div>
+            
+            <div class="control-group upload-section">
+                <div class="upload-controls" style="display: flex; gap: 8px;">
+                    <label class="btn-primary" for="file-upload" style="flex: 1; text-align: center; margin-bottom: 0; display: flex; align-items: center; justify-content: center; cursor: pointer;">
+                        Upload Tracks (.igc)
+                        <input type="file" id="file-upload" accept=".igc,.gpx,.kml" multiple style="display: none;">
+                    </label>
+                    <button id="btn-clear-tracks" class="btn-secondary danger" style="flex: 1;">Clear</button>
+                </div>
+                <div id="track-loader" class="track-loader hidden">
+                    <div class="track-loader-info">
+                        <div class="loader-spinner"></div>
+                        <span id="track-loader-text">Loading cached tracks...</span>
+                    </div>
+                    <div class="loader-bar-bg">
+                        <div id="loader-bar-fill" class="loader-bar-fill"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="control-group task-section">
+                <h3>Task Definition</h3>
+                <label class="btn-secondary" for="wpt-upload" style="margin-bottom: 8px;">
+                    Upload Waypoints (.wpt/.cup)
+                    <input type="file" id="wpt-upload" accept=".wpt,.cup" style="display: none;">
+                </label>
+                
+                <textarea id="task-textarea" placeholder="Paste task table here..." rows="4" style="width: 100%; background: var(--bg-card); color: var(--text-main); border: 1px solid var(--border); border-radius: 4px; padding: 8px; margin-bottom: 8px; font-family: monospace; font-size: 0.75rem; resize: vertical;">id 		Radius 	Dist. 	Description
+LAUNCH 	launch 	400 m   		LAUNCH
+LAUNCH 	SS 	10.0 Km 	10.00 Km 	LAUNCH
+BADGRN 		3.0 Km 	26.17 Km 	BADGRN
+US2WTH 		7.0 Km 	58.69 Km 	US2WTH
+ORNDLZ 		12.0 Km 	86.81 Km 	ORNDLZ
+SOCCER 	ES 	8.0 Km 	93.03 Km 	SOCCER
+SOCCER 	goal 	100 m   	101.00 Km 	SOCCER
+Startgate: 	13:30:00
+Deadline: 	19:00:00</textarea>
+
+                <div class="task-controls">
+                    <button id="btn-draw-task" class="btn-secondary">Draw Task</button>
+                    <button id="btn-clear-task" class="btn-secondary danger">Clear</button>
+                </div>
+                <div id="task-gate-info" class="task-gate-info" style="margin-top: 8px; font-size: 0.8rem; color: var(--text-muted); display: flex; flex-direction: column; gap: 4px;"></div>
+            </div>
+
+            <div class="pilot-stats-container">
+                <div class="pilot-list-header" style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+                    <h3>Pilots</h3>
+                    <div style="display: flex; gap: 6px; align-items: center;">
+                        <button id="btn-export-xlsx" class="btn-secondary" style="padding: 4px 8px; font-size: 0.75rem; margin-bottom: 0; cursor: pointer; display: flex; align-items: center; gap: 4px;" title="Export standings to Excel">
+                            📥 Export Excel
+                        </button>
+                        <select id="pilot-sort-select" class="sort-select" style="margin-bottom: 0;">
+                            <option value="name">Sort: Name</option>
+                        <option value="dist">Sort: Dist to Goal</option>
+                        <option value="alt">Sort: Altitude</option>
+                        <option value="gr">Sort: Inst GR</option>
+                        <option value="grGoal">Sort: GR to Goal</option>
+                        <option value="maxSpeed">Sort: Max Speed</option>
+                        <option value="fgDist">Sort: FG Dist</option>
+                        <option value="fgGr">Sort: FG GR</option>
+                        <option value="essAlt">Sort: ESS Alt AGL</option>
+                        <option value="essGr">Sort: ESS GR</option>
+                        <option value="essTime">Sort: ESS Time</option>
+                    </select>
+                </div>
+            </div>
+            <div class="table-container">
+                    <table class="pilot-table" id="pilot-table">
+                        <thead>
+                            <tr>
+                                <th><input type="checkbox" id="chk-all-tracks" checked style="margin-right: 4px; vertical-align: middle;"> Pilot</th>
+                                <th>Alt <span class="unit">(ft)</span></th>
+                                <th>Spd <span class="unit">(km/h)</span></th>
+                                <th>Dist <span class="unit">(km)</span></th>
+                                <th>GR</th>
+                                <th>GR to Goal</th>
+                            </tr>
+                        </thead>
+                        <tbody id="pilot-list">
+                            <!-- Rows injected here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </aside>
+        
+        <div id="sidebar-resizer" class="resizer"></div>
+        <button id="btn-toggle-sidebar" class="sidebar-toggle" title="Toggle Sidebar">◀</button>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <!-- Map Container -->
+            <div id="map-container" class="map-area">
+                <div id="map"></div>
+                
+                <div id="vertical-resizer"></div>
+                
+                <div id="side-view-container">
+                    <canvas id="side-view-canvas"></canvas>
+                    <button id="btn-reset-side-view" class="btn-side-overlay" title="Reset Scale / Fit Course">⟲ Fit Course</button>
+                </div>
+            </div>
+            
+            <!-- Bottom Timeline Controls -->
+            <div class="timeline-panel">
+                <div class="playback-controls">
+                    <button id="btn-play-pause" class="btn-icon">▶</button>
+                    <div class="speed-control">
+                        <label for="playback-speed">Speed:</label>
+                        <select id="playback-speed">
+                            <option value="1">1x</option>
+                            <option value="5">5x</option>
+                            <option value="10" selected>10x</option>
+                            <option value="30">30x</option>
+                            <option value="60">60x</option>
+                        </select>
+                    </div>
+                    <div class="time-display" id="time-display">--:--:--</div>
+                </div>
+                
+                <div class="scrubber-container">
+                    <input type="range" id="timeline-scrubber" min="0" max="100" value="0" step="1" disabled>
+                </div>
+            </div>
+        </main>
+
+        <!-- Statistics Correlation Right Panel -->
+        <button id="btn-toggle-right-panel" class="right-panel-toggle" title="Show Statistics Charts">
+            📊 Stats
+        </button>
+
+        <aside class="right-panel collapsed" id="right-panel">
+            <div id="right-panel-resizer" class="resizer-left"></div>
+            <div class="right-panel-header">
+                <h2>Statistics Charts</h2>
+                <button id="btn-close-right-panel" class="btn-close-panel" title="Close Panel">×</button>
+            </div>
+            
+            <div class="right-panel-content">
+                <div class="panel-section">
+                    <h3>Compare with ESS Time</h3>
+                    <div class="control-row" style="display: flex; gap: 8px; margin-bottom: 12px;">
+                        <div style="flex: 1;">
+                            <label for="chart-x-select" style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-bottom: 4px;">X-Axis Statistic</label>
+                            <select id="chart-x-select" style="width: 100%; padding: 6px; border-radius: 4px; background: var(--bg-card); color: var(--text-main); border: 1px solid var(--border); font-size: 0.825rem;">
+                                <option value="fgDist">FG Dist (km)</option>
+                                <option value="fgGr" selected>FG GR</option>
+                                <option value="essAlt">ESS Alt AGL (ft)</option>
+                                <option value="essGr">ESS GR</option>
+                                <option value="maxSpeed">Max Speed (10s avg, km/h)</option>
+                            </select>
+                        </div>
+                        <div style="flex: 1;">
+                            <label for="chart-fit-select" style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-bottom: 4px;">Trendline Fit</label>
+                            <select id="chart-fit-select" style="width: 100%; padding: 6px; border-radius: 4px; background: var(--bg-card); color: var(--text-main); border: 1px solid var(--border); font-size: 0.825rem;">
+                                <option value="linear">Linear Fit</option>
+                                <option value="quadratic" selected>Quadratic Fit</option>
+                                <option value="none">No Fit</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="panel-section stats-summary-card">
+                    <div id="stats-correlation-coef" class="correlation-coef">r = --</div>
+                    <div id="stats-correlation-desc" class="correlation-desc">No data loaded</div>
+                </div>
+
+                <div class="panel-section chart-wrapper">
+                    <canvas id="stats-chart"></canvas>
+                </div>
+
+                <div class="panel-section optimal-insight-card hidden" id="optimal-insight-card">
+                    <h4>💡 Optimal Value Insight</h4>
+                    <p id="optimal-insight-text">Loading...</p>
+                </div>
+
+                <div class="panel-section correlations-list-section">
+                    <h3>Correlation Table (vs ESS Time)</h3>
+                    <table class="correlation-table">
+                        <thead>
+                            <tr>
+                                <th>Statistic</th>
+                                <th>Pearson r</th>
+                                <th>Strength</th>
+                            </tr>
+                        </thead>
+                        <tbody id="correlations-table-body">
+                            <!-- Injected programmatically -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </aside>
+    </div>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    
+    <!-- SheetJS (xlsx) for Excel export -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    
+    <!-- Chart.js for statistics correlation analysis -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- Application Scripts -->
+    <script type="module" src="shared/geo-math.js"></script>
+    <script type="module" src="shared/parsers.js"></script>
+    <script type="module" src="shared/waypoint-parsers.js"></script>
+    <script type="module" src="shared/tactics.js"></script>
+    <script type="module" src="side-view.js"></script>
+    <script type="module" src="main.js"></script>
+</body>
+</html>
