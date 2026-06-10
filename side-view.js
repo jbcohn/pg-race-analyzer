@@ -151,6 +151,21 @@ export class SideView {
 
     render(state) {
         this.lastState = state;
+        
+        // Reset auto-fit zoom if the tracks, task, or visibility of tracks changes
+        const visibleTrackCount = (state.tracks || []).filter(t => t.visible !== false).length;
+        const trackCount = (state.tracks || []).length;
+        const taskLength = (state.task || []).length;
+        
+        if (this.lastTrackCount !== trackCount || 
+            this.lastTaskLength !== taskLength ||
+            this.lastVisibleTrackCount !== visibleTrackCount) {
+            this.hasAutoFit = false;
+            this.lastTrackCount = trackCount;
+            this.lastTaskLength = taskLength;
+            this.lastVisibleTrackCount = visibleTrackCount;
+        }
+
         this.pilotCoords = [];
         const ctx = this.ctx;
         
