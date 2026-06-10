@@ -2539,7 +2539,9 @@ function updateStatsAnalysis() {
     
     const scatterData = dataPoints.map(p => ({
         x: p.x,
-        y: p.y
+        y: p.y,
+        pilotName: p.pilot.fullName || p.pilot.name,
+        pilotId: p.pilot.id
     }));
     
     const pointColors = dataPoints.map(p => p.pilot.color);
@@ -2589,8 +2591,17 @@ function updateStatsAnalysis() {
                         callbacks: {
                             label: function(context) {
                                 if (context.datasetIndex === 0) {
-                                    const pt = dataPoints[context.dataIndex];
-                                    return `${pt.pilot.fullName || pt.pilot.name}: ${xLabel} = ${pt.x.toFixed(1)}, ESS Time = ${formatTime(pt.y)}`;
+                                    const raw = context.raw;
+                                    const xTitle = context.chart.options.scales.x.title.text;
+                                    let xValStr = '';
+                                    if (xTitle.includes('Alt') || xTitle.includes('Speed')) {
+                                        xValStr = Math.round(raw.x).toString();
+                                    } else if (xTitle.includes('GR')) {
+                                        xValStr = raw.x > 100 ? '99+' : raw.x.toFixed(1);
+                                    } else {
+                                        xValStr = raw.x.toFixed(1);
+                                    }
+                                    return `${raw.pilotName}: ${xTitle} = ${xValStr}, ESS Time = ${formatTime(raw.y)}`;
                                 }
                                 return null;
                             }
@@ -2632,12 +2643,15 @@ function updateStatsAnalysis() {
                 },
                 onClick: (event, activeElements) => {
                     if (activeElements.length > 0) {
-                        const elementIndex = activeElements[0].index;
                         const datasetIndex = activeElements[0].datasetIndex;
                         if (datasetIndex === 0) { // Scatter dataset
-                            const pt = dataPoints[elementIndex];
-                            if (pt && pt.pilot) {
-                                highlightPilot(pt.pilot);
+                            const elementIndex = activeElements[0].index;
+                            if (statsChart && statsChart.data.datasets[0].data[elementIndex]) {
+                                const rawPoint = statsChart.data.datasets[0].data[elementIndex];
+                                const pilot = state.tracks.find(t => t.id === rawPoint.pilotId);
+                                if (pilot) {
+                                    highlightPilot(pilot);
+                                }
                             }
                         }
                     }
