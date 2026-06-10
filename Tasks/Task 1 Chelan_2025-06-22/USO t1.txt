@@ -1,0 +1,13 @@
+Task 1
+2025-06-22
+Race 58.4 Km
+Official Result
+id 		Radius 	Dist. 	Description
+LAUNCH 	launch 	400 m   		LAUNCH
+LAUNCH 	SS 	10.0 Km 	10.00 Km 	LAUNCH
+MANSFL 		400 m   	29.24 Km 	MANSFL
+MANSFL 		15.0 Km 	43.85 Km 	MANSFL
+MANSFL 	ES 	2.0 Km 	56.85 Km 	MANSFL
+MANSFL 	goal 	400 m   	58.45 Km 	MANSFL
+Startgate: 	12:20:00
+Deadline: 	15:00:00

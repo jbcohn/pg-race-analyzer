@@ -271,8 +271,187 @@ function initApp() {
     if (chartXSelect) chartXSelect.addEventListener('change', updateStatsAnalysis);
     if (chartFitSelect) chartFitSelect.addEventListener('change', updateStatsAnalysis);
     
+    // Setup predefined tasks dropdown if manifest is available
+    setupPredefinedTasks();
+
     // Restore persisted data from localStorage
     restoreFromStorage();
+}
+
+function setupPredefinedTasks() {
+    fetch('Tasks/manifest.json')
+        .then(res => {
+            if (!res.ok) throw new Error('No predefined tasks found');
+            return res.json();
+        })
+        .then(manifest => {
+            const container = document.getElementById('task-presets-container');
+            const select = document.getElementById('task-select');
+            if (!container || !select) return;
+            
+            // Clear default and populate options
+            select.innerHTML = '<option value="">-- Select Task --</option>';
+            manifest.tasks.forEach(task => {
+                const opt = document.createElement('option');
+                opt.value = task.id;
+                opt.textContent = task.name;
+                select.appendChild(opt);
+            });
+            
+            container.style.display = 'block';
+            
+            select.addEventListener('change', async (e) => {
+                const val = e.target.value;
+                if (!val) return;
+                
+                const taskInfo = manifest.tasks.find(t => t.id === val);
+                if (!taskInfo) return;
+                
+                const loaderEl = document.getElementById('track-loader');
+                const loaderTextEl = document.getElementById('track-loader-text');
+                const loaderBarEl = document.getElementById('loader-bar-fill');
+                
+                if (loaderEl) {
+                    loaderEl.classList.remove('hidden');
+                    if (loaderTextEl) loaderTextEl.textContent = 'Loading task preset...';
+                    if (loaderBarEl) loaderBarEl.style.width = '0%';
+                }
+                
+                try {
+                    select.disabled = true;
+                    
+                    // 1. Load waypoints
+                    if (manifest.waypoint_file) {
+                        if (loaderTextEl) loaderTextEl.textContent = 'Loading waypoints...';
+                        const wptRes = await fetch(manifest.waypoint_file);
+                        const wptText = await wptRes.text();
+                        const newWpts = parseWaypointFile(wptText, "us-open-paragliding-2025.FS(1).wpt");
+                        Object.assign(state.waypoints, newWpts);
+                        try { localStorage.setItem('pg-waypoints', JSON.stringify(state.waypoints)); } catch(err) {}
+                    }
+                    
+                    // 2. Load task definition
+                    if (taskInfo.task_file) {
+                        if (loaderTextEl) loaderTextEl.textContent = 'Loading task definition...';
+                        const taskRes = await fetch(taskInfo.task_file);
+                        const taskText = await taskRes.text();
+                        document.getElementById('task-textarea').value = taskText;
+                        try { localStorage.setItem('pg-task-text', taskText); } catch(err) {}
+                        drawTask();
+                    }
+                    
+                    // 3. Clear existing tracks
+                    if (state.isPlaying) {
+                        togglePlayback();
+                    }
+                    state.tracks.forEach(t => {
+                        if (state.map && t.layerGroup) {
+                            state.map.removeLayer(t.layerGroup);
+                        }
+                    });
+                    state.tracks = [];
+                    state.minTime = Infinity;
+                    state.maxTime = -Infinity;
+                    state.currentTime = 0;
+                    
+                    const scrubber = document.getElementById('timeline-scrubber');
+                    if (scrubber) {
+                        scrubber.value = 0;
+                        scrubber.disabled = true;
+                    }
+                    const timeDisplay = document.getElementById('time-display');
+                    if (timeDisplay) timeDisplay.textContent = '--:--:--';
+                    
+                    // Clear IndexedDB store
+                    const db = await getDB();
+                    if (db) {
+                        const tx = db.transaction(STORE_NAME, 'readwrite');
+                        tx.objectStore(STORE_NAME).clear();
+                        await new Promise((resolve, reject) => {
+                            tx.oncomplete = () => resolve();
+                            tx.onerror = (e) => reject(tx.error || e.target.error);
+                        });
+                    }
+                    
+                    // 4. Fetch and load the track logs in parallel with concurrency limit of 6
+                    const igcFiles = taskInfo.igc_files;
+                    const total = igcFiles.length;
+                    let loadedCount = 0;
+                    
+                    async function fetchAndAddTrack(url) {
+                        const filename = url.substring(url.lastIndexOf('/') + 1);
+                        const cleanName = formatPilotName(filename);
+                        if (loaderTextEl) loaderTextEl.textContent = `Fetching ${cleanName}...`;
+                        
+                        const trackRes = await fetch(url);
+                        const text = await trackRes.text();
+                        const trackPoints = parseIGC(text);
+                        if (!trackPoints || trackPoints.length === 0) return;
+                        
+                        // Add track to state
+                        const points = ensureTimestamps(trackPoints);
+                        addTrackToState(filename, points);
+                        
+                        // Save to IndexedDB
+                        if (db) {
+                            const tx = db.transaction(STORE_NAME, 'readwrite');
+                            tx.objectStore(STORE_NAME).put({
+                                name: filename,
+                                rawName: filename,
+                                points: points,
+                                visible: true
+                            });
+                        }
+                        
+                        loadedCount++;
+                        const pct = Math.round((loadedCount / total) * 100);
+                        if (loaderBarEl) loaderBarEl.style.width = `${pct}%`;
+                        if (loaderTextEl) loaderTextEl.textContent = `Loading tracks (${loadedCount}/${total})...`;
+                    }
+                    
+                    const concurrency = 6;
+                    const queue = [...igcFiles];
+                    
+                    async function worker() {
+                        while (queue.length > 0) {
+                            const url = queue.shift();
+                            try {
+                                await fetchAndAddTrack(url);
+                            } catch (err) {
+                                console.error(`Error loading track file ${url}:`, err);
+                            }
+                        }
+                    }
+                    
+                    const workers = [];
+                    for (let i = 0; i < Math.min(concurrency, queue.length); i++) {
+                        workers.push(worker());
+                    }
+                    
+                    await Promise.all(workers);
+                    
+                    // Trigger UI updates
+                    onAllFilesLoaded();
+                    
+                } catch (err) {
+                    console.error('Failed to load task preset:', err);
+                    alert('Error loading task preset: ' + err.message);
+                } finally {
+                    select.disabled = false;
+                    if (loaderEl) loaderEl.classList.add('hidden');
+                }
+            });
+        })
+        .catch(err => {
+            console.log('Predefined tasks manifest not available or failed to load:', err);
+        });
+}
+
+function resetPredefinedTaskSelect() {
+    const select = document.getElementById('task-select');
+    if (select) {
+        select.value = '';
+    }
 }
 
 function setupSidebarControls() {
@@ -364,6 +543,7 @@ function setupSidebarControls() {
 }
 
 function handleWptUpload(e) {
+    resetPredefinedTaskSelect();
     const file = e.target.files[0];
     if (!file) return;
 
@@ -575,6 +755,7 @@ function clearTask() {
     
     if (sideView) sideView.render(state);
     try { localStorage.removeItem('pg-task-text'); } catch(e) {}
+    resetPredefinedTaskSelect();
 }
 
 async function fetchTerrainProfile() {
@@ -826,6 +1007,7 @@ async function fetchTrackTerrainProfileDirect(track) {
 }
 
 function handleFileUpload(e) {
+    resetPredefinedTaskSelect();
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
@@ -952,6 +1134,7 @@ function clearTracks() {
     
     updatePilotListUI();
     clearTracksInStorage();
+    resetPredefinedTaskSelect();
     
     if (sideView) sideView.render(state);
 }

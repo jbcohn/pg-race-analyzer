@@ -46,6 +46,12 @@
 
             <div class="control-group task-section">
                 <h3>Task Definition</h3>
+                <div class="task-presets-row" id="task-presets-container" style="margin-bottom: 8px; display: none;">
+                    <label for="task-select" style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 4px; display: block;">Select Predefined Task:</label>
+                    <select id="task-select" style="width: 100%; background: var(--bg-card); color: var(--text-main); border: 1px solid var(--border); border-radius: 4px; padding: 6px; font-size: 0.8rem; margin-bottom: 8px;">
+                        <option value="">-- Select Task --</option>
+                    </select>
+                </div>
                 <label class="btn-secondary" for="wpt-upload" style="margin-bottom: 8px;">
                     Upload Waypoints (.wpt/.cup)
                     <input type="file" id="wpt-upload" accept=".wpt,.cup" style="display: none;">

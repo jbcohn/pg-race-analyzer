@@ -1,0 +1,14 @@
+Task 2
+2025-06-23
+Race 101.0 Km
+Official Result
+id 		Radius 	Dist. 	Description
+LAUNCH 	launch 	400 m   		LAUNCH
+LAUNCH 	SS 	10.0 Km 	10.00 Km 	LAUNCH
+BADGRN 		3.0 Km 	26.17 Km 	BADGRN
+US2WTH 		7.0 Km 	58.69 Km 	US2WTH
+ORNDLZ 		12.0 Km 	86.81 Km 	ORNDLZ
+SOCCER 	ES 	8.0 Km 	93.03 Km 	SOCCER
+SOCCER 	goal 	100 m   	101.00 Km 	SOCCER
+Startgate: 	13:30:00
+Deadline: 	19:00:00
