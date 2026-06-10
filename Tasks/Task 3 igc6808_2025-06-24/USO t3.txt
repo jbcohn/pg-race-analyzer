@@ -1,0 +1,15 @@
+ Task 3
+2025-06-24
+Race 80.9 Km
+Official Result
+id 		Radius 	Dist. 	Description
+LAUNCH 	launch 	400 m   		LAUNCH
+LAUNCH 	SS 	11.0 Km 	11.00 Km 	LAUNCH
+US2WTH 		18.0 Km 	23.49 Km 	US2WTH
+BUMPRD 		2.0 Km 	30.45 Km 	BUMPRD
+SIMSCR 		2.0 Km 	55.95 Km 	SIMSCR
+LEAHY 		3.0 Km 	64.86 Km 	LEAHY
+H17BRK 	ES 	2.0 Km 	79.34 Km 	H17BRK
+H17BRK 	goal 	400 m   	80.94 Km 	H17BRK
+Startgate: 	13:45:00
+Deadline: 	17:45:00
