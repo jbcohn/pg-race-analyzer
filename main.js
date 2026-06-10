@@ -816,20 +816,30 @@ async function fetchTerrainProfile() {
             
             try {
                 const resp = await fetch(`https://api.open-meteo.com/v1/elevation?latitude=${lats}&longitude=${lngs}`);
+                if (!resp.ok) throw new Error(`HTTP error ${resp.status}`);
                 const data = await resp.json();
-                if (data && data.elevation) {
+                if (data && data.elevation && !data.error) {
                     await saveElevationsToCache(missingPoints, data.elevation);
                     for (let k = 0; k < missingPoints.length; k++) {
                         cached[missingIndices[k]] = data.elevation[k];
                     }
+                } else {
+                    throw new Error((data && data.reason) || "API returned error status");
                 }
             } catch (err) {
                 console.warn('Failed to fetch terrain elevations:', err);
-                return; // Fall back to crude turnpoint-only profile
+                useTerrainFallback(task, samplePoints, totalTaskDist, endGoalIdx);
+                return;
             }
         }
         
         elevations.push(...cached);
+    }
+    
+    // Check if any elevations are missing (e.g. if the cache lookup returned null and we skipped fetch due to an error that was handled)
+    if (elevations.includes(null)) {
+        useTerrainFallback(task, samplePoints, totalTaskDist, endGoalIdx);
+        return;
     }
     
     state.terrainProfile = samplePoints.map((p, i) => {
@@ -842,6 +852,33 @@ async function fetchTerrainProfile() {
     });
     
     console.log(`Loaded ${state.terrainProfile.length} terrain elevation points`);
+    if (sideView) sideView.render(state);
+}
+
+function useTerrainFallback(task, samplePoints, totalTaskDist, endGoalIdx) {
+    state.terrainProfile = samplePoints.map(p => {
+        let elev = 0;
+        for (let i = 0; i < endGoalIdx; i++) {
+            const from = task[i];
+            const to = task[i + 1];
+            const distAtFrom = totalTaskDist - calculateRemainingLegs(task, i, endGoalIdx);
+            const distAtTo = totalTaskDist - calculateRemainingLegs(task, i + 1, endGoalIdx);
+            
+            if (p.distKm >= distAtFrom && p.distKm <= distAtTo) {
+                const legLen = distAtTo - distAtFrom;
+                const t = legLen > 0 ? (p.distKm - distAtFrom) / legLen : 0;
+                const fromElev = from.elev || 0;
+                const toElev = to.elev || 0;
+                elev = fromElev + (toElev - fromElev) * t;
+                break;
+            }
+        }
+        return {
+            distKm: p.distKm,
+            elevFt: elev * 3.28084
+        };
+    });
+    console.log(`Loaded ${state.terrainProfile.length} terrain elevation points (interpolated fallback)`);
     if (sideView) sideView.render(state);
 }
 
@@ -939,12 +976,15 @@ async function fetchTrackTerrainProfileDirect(track) {
             
             try {
                 const resp = await fetch(`https://api.open-meteo.com/v1/elevation?latitude=${lats}&longitude=${lngs}`);
+                if (!resp.ok) throw new Error(`HTTP error ${resp.status}`);
                 const data = await resp.json();
-                if (data && data.elevation) {
+                if (data && data.elevation && !data.error) {
                     await saveElevationsToCache(missingPoints, data.elevation);
                     for (let k = 0; k < missingPoints.length; k++) {
                         cached[missingIndices[k]] = data.elevation[k];
                     }
+                } else {
+                    throw new Error((data && data.reason) || "API returned error status");
                 }
             } catch (err) {
                 console.warn(`Failed to fetch terrain elevations for pilot ${track.name}:`, err);
