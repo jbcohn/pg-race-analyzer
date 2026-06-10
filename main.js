@@ -92,7 +92,7 @@ let sideView;
 
 async function loadLocalDem() {
     try {
-        const response = await fetch('Tasks/chelan-dem.json');
+        const response = await fetch(`Tasks/chelan-dem.json?t=${Date.now()}`);
         if (!response.ok) throw new Error(`HTTP error ${response.status}`);
         state.localDem = await response.json();
         console.log("Successfully loaded local DEM grid:", state.localDem.rows, "x", state.localDem.cols);
@@ -320,7 +320,7 @@ function initApp() {
 }
 
 function setupPredefinedTasks() {
-    fetch('Tasks/manifest.json')
+    fetch(`Tasks/manifest.json?t=${Date.now()}`)
         .then(res => {
             if (!res.ok) throw new Error('No predefined tasks found');
             return res.json();
@@ -364,7 +364,7 @@ function setupPredefinedTasks() {
                     // 1. Load waypoints
                     if (manifest.waypoint_file) {
                         if (loaderTextEl) loaderTextEl.textContent = 'Loading waypoints...';
-                        const wptRes = await fetch(manifest.waypoint_file);
+                        const wptRes = await fetch(`${manifest.waypoint_file}?t=${Date.now()}`);
                         const wptText = await wptRes.text();
                         const newWpts = parseWaypointFile(wptText, "us-open-paragliding-2025.FS(1).wpt");
                         Object.assign(state.waypoints, newWpts);
@@ -374,7 +374,7 @@ function setupPredefinedTasks() {
                     // 2. Load task definition
                     if (taskInfo.task_file) {
                         if (loaderTextEl) loaderTextEl.textContent = 'Loading task definition...';
-                        const taskRes = await fetch(taskInfo.task_file);
+                        const taskRes = await fetch(`${taskInfo.task_file}?t=${Date.now()}`);
                         const taskText = await taskRes.text();
                         document.getElementById('task-textarea').value = taskText;
                         try { localStorage.setItem('pg-task-text', taskText); } catch(err) {}
@@ -424,7 +424,7 @@ function setupPredefinedTasks() {
                         const cleanName = formatPilotName(filename);
                         if (loaderTextEl) loaderTextEl.textContent = `Fetching ${cleanName}...`;
                         
-                        const trackRes = await fetch(url);
+                        const trackRes = await fetch(`${url}?t=${Date.now()}`);
                         const text = await trackRes.text();
                         const trackPoints = parseIGC(text);
                         if (!trackPoints || trackPoints.length === 0) return;
