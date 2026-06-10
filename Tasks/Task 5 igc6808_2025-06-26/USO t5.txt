@@ -1,0 +1,13 @@
+ Task 5
+2025-06-26
+Race 82.7 Km
+Official Result
+id 		Radius 	Dist. 	Description
+LAUNCH 	launch 	400 m   		LAUNCH
+LAUNCH 	SS 	11.0 Km 	11.00 Km 	LAUNCH
+BUMPRD 		6.0 Km 	18.70 Km 	BUMPRD
+GR303 		10.0 Km 	61.13 Km 	GR303
+OKANGN 	ES 	2.0 Km 	80.74 Km 	OKANGN
+OKANGN 	goal 	100 m   	82.71 Km 	OKANGN
+Startgate: 	13:00:00
+Deadline: 	17:00:00

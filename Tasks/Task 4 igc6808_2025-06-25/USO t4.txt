@@ -1,0 +1,12 @@
+ Task 4
+2025-06-25
+Race 103.1 Km
+Official Result
+id 		Radius 	Dist. 	Description
+LAUNCH 	launch 	400 m   		LAUNCH
+LAUNCH 	SS 	4.0 Km 	4.00 Km 	LAUNCH
+COULEE 		5.0 Km 	61.28 Km 	COULEE
+WILBLZ 	ES 	2.0 Km 	101.15 Km 	WILBLZ
+WILBLZ 	goal 	100 m   	103.14 Km 	WILBLZ
+Startgate: 	12:30:00
+Deadline: 	16:30:00

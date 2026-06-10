@@ -1,0 +1,14 @@
+ Task 7
+2025-06-28
+Race 80.6 Km
+Official Result
+id 		Radius 	Dist. 	Description
+LAUNCH 	launch 	400 m   		LAUNCH
+LAUNCH 	SS 	4.0 Km 	4.00 Km 	LAUNCH
+BADGRN 		4.0 Km 	25.41 Km 	BADGRN
+RDBRD4 		5.0 Km 	47.56 Km 	RDBRD4
+G12RD 		8.0 Km 	65.84 Km 	G12RD
+MANSFL 	ES 	2.0 Km 	79.03 Km 	MANSFL
+MANSFL 	goal 	400 m   	80.63 Km 	MANSFL
+Startgate: 	12:30:00
+Deadline: 	16:30:00
