@@ -22,7 +22,8 @@ const state = {
     startGateTimeStr: null,
     deadlineTime: null,
     deadlineTimeStr: null,
-    isStatsResizedManually: false
+    isStatsResizedManually: false,
+    localDem: null
 };
 
 // Pilot Colors mapping to CSS variables
@@ -89,7 +90,47 @@ function getPilotInitials(rawName) {
 
 let sideView;
 
+async function loadLocalDem() {
+    try {
+        const response = await fetch('Tasks/chelan-dem.json');
+        if (!response.ok) throw new Error(`HTTP error ${response.status}`);
+        state.localDem = await response.json();
+        console.log("Successfully loaded local DEM grid:", state.localDem.rows, "x", state.localDem.cols);
+    } catch (err) {
+        console.warn("Could not load local DEM grid:", err);
+    }
+}
+
+function getLocalElevation(lat, lng) {
+    if (!state.localDem) return null;
+    const { latMin, latMax, lngMin, lngMax, rows, cols, elevations } = state.localDem;
+    if (lat < latMin || lat > latMax || lng < lngMin || lng > lngMax) return null;
+    
+    // Convert to grid coordinates
+    const r = ((lat - latMin) / (latMax - latMin)) * (rows - 1);
+    const c = ((lng - lngMin) / (lngMax - lngMin)) * (cols - 1);
+    
+    const r0 = Math.floor(r);
+    const r1 = Math.min(rows - 1, r0 + 1);
+    const ty = r - r0;
+    
+    const c0 = Math.floor(c);
+    const c1 = Math.min(cols - 1, c0 + 1);
+    const tx = c - c0;
+    
+    const e00 = elevations[r0 * cols + c0];
+    const e01 = elevations[r0 * cols + c1];
+    const e10 = elevations[r1 * cols + c0];
+    const e11 = elevations[r1 * cols + c1];
+    
+    // Bilinear interpolation
+    return (1 - tx) * (1 - ty) * e00 + tx * (1 - ty) * e01 + (1 - tx) * ty * e10 + tx * ty * e11;
+}
+
 function initApp() {
+    // Load local DEM grid data
+    loadLocalDem();
+
     // Setup Map
     state.map = L.map('map').setView([46.8, 8.2], 8); // Default to Switzerland
     
@@ -791,6 +832,29 @@ async function fetchTerrainProfile() {
     const goalTP = task[endGoalIdx];
     samplePoints.push({ lat: goalTP.lat, lng: goalTP.lng, distKm: totalTaskDist });
     
+    // Check if local DEM contains these points
+    if (state.localDem) {
+        let allValid = true;
+        const localElevations = [];
+        for (let i = 0; i < samplePoints.length; i++) {
+            const elev = getLocalElevation(samplePoints[i].lat, samplePoints[i].lng);
+            if (elev === null) {
+                allValid = false;
+                break;
+            }
+            localElevations.push(elev);
+        }
+        if (allValid) {
+            state.terrainProfile = samplePoints.map((p, i) => ({
+                distKm: p.distKm,
+                elevFt: localElevations[i] * 3.28084
+            }));
+            console.log(`Loaded ${state.terrainProfile.length} terrain elevation points from local DEM`);
+            if (sideView) sideView.render(state);
+            return;
+        }
+    }
+    
     // Fetch elevations from Open-Meteo in batches of 100 with DEM caching
     const BATCH_SIZE = 100;
     const elevations = [];
@@ -952,6 +1016,70 @@ async function fetchTrackTerrainProfileDirect(track) {
             index: idx
         };
     });
+    
+    // Check if local DEM contains these points
+    if (state.localDem) {
+        let allValid = true;
+        const localElevations = [];
+        for (let i = 0; i < samplePoints.length; i++) {
+            const elev = getLocalElevation(samplePoints[i].lat, samplePoints[i].lng);
+            if (elev === null) {
+                allValid = false;
+                break;
+            }
+            localElevations.push(elev);
+        }
+        if (allValid) {
+            track.terrainProfile = samplePoints.map((p, i) => {
+                let elev = parseFloat(localElevations[i]);
+                if (isNaN(elev)) elev = 0;
+                return {
+                    distKm: p.distKm,
+                    elevFt: elev * 3.28084,
+                    lat: p.lat,
+                    lng: p.lng,
+                    index: p.index
+                };
+            });
+            if (sideView) sideView.render(state);
+            
+            // Instantly update alt display in pilot standings table
+            const altEl = document.getElementById(`alt-${track.id}`);
+            if (altEl) {
+                const currentIdx = track.currentPosIndex !== undefined ? track.currentPosIndex : 0;
+                const currentPos = track.points[currentIdx];
+                if (currentPos) {
+                    const altFt = currentPos.alt * 3.28084;
+                    let aglStr = '';
+                    const profile = track.terrainProfile;
+                    let groundElevFt = null;
+                    if (profile[0].index !== undefined) {
+                        if (currentIdx <= profile[0].index) {
+                            groundElevFt = profile[0].elevFt;
+                        } else if (currentIdx >= profile[profile.length - 1].index) {
+                            groundElevFt = profile[profile.length - 1].elevFt;
+                        } else {
+                            for (let i = 0; i < profile.length - 1; i++) {
+                                const p1 = profile[i];
+                                const p2 = profile[i + 1];
+                                if (currentIdx >= p1.index && currentIdx <= p2.index) {
+                                    const ratio = (currentIdx - p1.index) / (p2.index - p1.index);
+                                    groundElevFt = p1.elevFt + ratio * (p2.elevFt - p1.elevFt);
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    if (groundElevFt !== null) {
+                        aglStr = ` (${Math.round(altFt - groundElevFt)})`;
+                    }
+                    altEl.textContent = `${Math.round(altFt)}${aglStr}`;
+                }
+            }
+            saveTracksToStorage();
+            return;
+        }
+    }
     
     const BATCH_SIZE = 100;
     const elevations = [];
