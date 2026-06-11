@@ -1244,11 +1244,24 @@ function addTrackToState(rawName, points, terrainProfile = null) {
         initialHeading = rad * 180 / Math.PI;
     }
 
-    // Dynamic Pilot Marker
+    // Dynamic Pilot Marker (Paraglider Wing shape)
     const iconHtml = `
         <div class="pilot-marker-icon" title="${fullName}">
-            <div class="pilot-marker-dot" style="background-color: ${color}; border-color: white; transform: rotate(${initialHeading}deg);">
-                <div class="pilot-marker-arrow"></div>
+            <div class="pilot-marker-dot" style="transform: rotate(${initialHeading}deg);">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <!-- Lines connecting wing to pilot -->
+                    <line x1="2" y1="12" x2="12" y2="18" stroke="rgba(15, 23, 42, 0.45)" stroke-width="0.75" />
+                    <line x1="22" y1="12" x2="12" y2="18" stroke="rgba(15, 23, 42, 0.45)" stroke-width="0.75" />
+                    <line x1="7" y1="9.5" x2="12" y2="18" stroke="rgba(15, 23, 42, 0.45)" stroke-width="0.75" />
+                    <line x1="17" y1="9.5" x2="12" y2="18" stroke="rgba(15, 23, 42, 0.45)" stroke-width="0.75" />
+                    <!-- Pilot dot/harness -->
+                    <circle cx="12" cy="18" r="2.5" fill="#0f172a" stroke="white" stroke-width="0.75" />
+                    <!-- Paraglider Wing Canopy -->
+                    <path d="M 2 12 Q 12 3 22 12 Q 12 7 2 12 Z" fill="${color}" stroke="#0f172a" stroke-width="1.25" stroke-linejoin="round" />
+                    <!-- Internal cell details for 3D look -->
+                    <path d="M 5 10.3 Q 12 5.5 19 10.3" stroke="rgba(255,255,255,0.4)" stroke-width="0.75" />
+                    <path d="M 8 9 Q 12 4.8 16 9" stroke="rgba(255,255,255,0.4)" stroke-width="0.75" />
+                </svg>
             </div>
             <div class="pilot-marker-label" style="background-color: ${color};">${initials}</div>
         </div>
@@ -1256,8 +1269,8 @@ function addTrackToState(rawName, points, terrainProfile = null) {
     const icon = L.divIcon({
         html: iconHtml,
         className: '',
-        iconSize: [16, 16],
-        iconAnchor: [8, 8]
+        iconSize: [24, 24],
+        iconAnchor: [12, 12]
     });
     
     const marker = L.marker([points[0].lat, points[0].lng], { icon, title: fullName }).addTo(layerGroup);

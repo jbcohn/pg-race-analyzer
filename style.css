@@ -467,22 +467,11 @@ input[type=range]:disabled::-webkit-slider-thumb { background: var(--text-muted)
 
 .pilot-marker-icon { background: none; border: none; }
 .pilot-marker-dot {
-    width: 16px; height: 16px; border-radius: 50%; border: 2px solid white;
-    box-shadow: 0 0 4px rgba(0,0,0,0.5); position: absolute; top: -8px; left: -8px;
+    width: 24px; height: 24px; position: absolute; top: -12px; left: -12px;
     transition: transform 0.1s linear; /* Smooth heading rotation transition */
 }
-.pilot-marker-arrow {
-    width: 0;
-    height: 0;
-    border-left: 4px solid transparent;
-    border-right: 4px solid transparent;
-    border-bottom: 6px solid white;
-    position: absolute;
-    top: -6px;
-    left: 4px;
-}
 .pilot-marker-label {
-    position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
+    position: absolute; top: 16px; left: 50%; transform: translateX(-50%);
     background: rgba(0,0,0,0.7); color: white; padding: 2px 6px; border-radius: 4px;
     font-size: 10px; font-weight: bold; white-space: nowrap;
 }
