@@ -2725,6 +2725,11 @@ function updateLiftSinkOverlay() {
     if (!state.liftSinkLayerGroup) return;
     state.liftSinkLayerGroup.clearLayers();
     
+    const mapEl = document.getElementById('map');
+    if (mapEl) {
+        mapEl.classList.toggle('liftsink-active', state.liftSinkEnabled);
+    }
+    
     if (!state.liftSinkEnabled || state.tracks.length === 0) {
         return;
     }
