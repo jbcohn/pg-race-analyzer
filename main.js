@@ -445,17 +445,6 @@ function setupPredefinedTasks() {
                         const points = ensureTimestamps(trackPoints);
                         addTrackToState(filename, points);
                         
-                        // Save to IndexedDB
-                        if (db) {
-                            const tx = db.transaction(STORE_NAME, 'readwrite');
-                            tx.objectStore(STORE_NAME).put({
-                                name: filename,
-                                rawName: filename,
-                                points: points,
-                                visible: true
-                            });
-                        }
-                        
                         loadedCount++;
                         const pct = Math.round((loadedCount / total) * 100);
                         if (loaderBarEl) loaderBarEl.style.width = `${pct}%`;
@@ -990,6 +979,7 @@ async function processTerrainQueue() {
     }
     
     isFetchingTerrain = false;
+    await saveTracksToStorage();
 }
 
 async function fetchTrackTerrainProfileDirect(track) {
@@ -1088,7 +1078,7 @@ async function fetchTrackTerrainProfileDirect(track) {
                     altEl.textContent = `${Math.round(altFt)}${aglStr}`;
                 }
             }
-            saveTracksToStorage();
+            saveSingleTrackToStorage(track);
             return;
         }
     }
@@ -1182,7 +1172,7 @@ async function fetchTrackTerrainProfileDirect(track) {
                 altEl.textContent = `${Math.round(altFt)}${aglStr}`;
             }
         }
-        saveTracksToStorage();
+        saveSingleTrackToStorage(track);
     }
 }
 
@@ -2023,7 +2013,7 @@ async function saveTracksToStorage() {
         store.clear();
         for (const t of state.tracks) {
             const data = { 
-                name: t.name, 
+                name: t.rawName || t.name, 
                 rawName: t.rawName || t.name, 
                 points: t.points,
                 terrainProfile: t.terrainProfile 
@@ -2044,6 +2034,28 @@ async function saveTracksToStorage() {
         localStorage.removeItem('pg-tracks');
     } catch (e) {
         console.warn('Could not save tracks to IndexedDB:', e);
+    }
+}
+
+async function saveSingleTrackToStorage(t) {
+    try {
+        const db = await getDB();
+        const tx = db.transaction(STORE_NAME, 'readwrite');
+        const store = tx.objectStore(STORE_NAME);
+        const data = { 
+            name: t.rawName || t.name, 
+            rawName: t.rawName || t.name, 
+            points: t.points,
+            terrainProfile: t.terrainProfile 
+        };
+        store.put(data);
+        await new Promise((resolve, reject) => {
+            tx.oncomplete = () => resolve();
+            tx.onerror = (e) => reject(tx.error || e.target.error);
+            tx.onabort = (e) => reject(tx.error || e.target.error);
+        });
+    } catch (e) {
+        console.warn(`Could not save single track ${t.name} to IndexedDB:`, e);
     }
 }
 
