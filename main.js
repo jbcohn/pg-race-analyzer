@@ -23,7 +23,13 @@ const state = {
     deadlineTime: null,
     deadlineTimeStr: null,
     isStatsResizedManually: false,
-    localDem: null
+    localDem: null,
+    liftSinkEnabled: false,
+    liftSinkMode: 'raw',
+    liftSinkWindow: 600,
+    liftSinkGridSize: 150,
+    liftSinkMinPoints: 3,
+    liftSinkLayerGroup: null
 };
 
 // Pilot Colors mapping to CSS variables
@@ -138,6 +144,9 @@ function initApp() {
         maxZoom: 17,
         attribution: 'Map data: &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, SRTM | Map style: &copy; <a href="https://opentopomap.org">OpenTopoMap</a> (CC-BY-SA)'
     }).addTo(state.map);
+
+    // Lift/Sink layer group
+    state.liftSinkLayerGroup = L.featureGroup().addTo(state.map);
 
     // Event Listeners
     document.getElementById('file-upload').addEventListener('change', handleFileUpload);
@@ -317,6 +326,9 @@ function initApp() {
 
     // Restore persisted data from localStorage
     restoreFromStorage();
+
+    // Initialize Lift/Sink Overlay Controls
+    initLiftSinkControls();
 }
 
 function setupPredefinedTasks() {
@@ -1305,6 +1317,11 @@ function clearTracks() {
     resetPredefinedTaskSelect();
     
     if (sideView) sideView.render(state);
+    
+    // Clear Lift/Sink overlay
+    if (state.liftSinkLayerGroup) {
+        state.liftSinkLayerGroup.clearLayers();
+    }
 }
 
 async function clearTracksInStorage() {
@@ -1640,6 +1657,9 @@ function updatePlaybackState() {
     
     // Render side view once per frame
     if (sideView) sideView.render(state);
+
+    // Update Lift/Sink map overlay
+    updateLiftSinkOverlay();
 }
 
 function sortPilotList() {
@@ -2657,6 +2677,331 @@ function updateStatsAnalysis() {
                     }
                 }
             }
+        });
+    }
+}
+
+/**
+ * Calculates 10-second centered vertical speed (climb/sink rate in m/s)
+ * for each trackpoint lazily when the Lift/Sink overlay is activated.
+ */
+function lazyComputeClimbRates(track) {
+    if (track.hasClimbRates) return;
+    const pts = track.points;
+    const n = pts.length;
+    if (n === 0) return;
+    
+    let j = 0;
+    let k = 0;
+    for (let i = 0; i < n; i++) {
+        const t = pts[i].time;
+        
+        // Find left boundary j (time >= t - 5)
+        while (j < i && pts[j].time < t - 5) {
+            j++;
+        }
+        // Find right boundary k (time <= t + 5)
+        while (k < n - 1 && pts[k + 1].time <= t + 5) {
+            k++;
+        }
+        
+        const dt = pts[k].time - pts[j].time;
+        if (dt > 0) {
+            pts[i].climbRate = (pts[k].alt - pts[j].alt) / dt;
+        } else {
+            pts[i].climbRate = 0;
+        }
+    }
+    track.hasClimbRates = true;
+    console.log(`Lazily computed climb rates for ${track.fullName}`);
+}
+
+/**
+ * Renders the Lift/Sink Map overlay.
+ * Uses raw tracks (emerald green/rose red/amber yellow polylines)
+ * or spatial grid averages based on user settings and current playback time.
+ */
+function updateLiftSinkOverlay() {
+    if (!state.liftSinkLayerGroup) return;
+    state.liftSinkLayerGroup.clearLayers();
+    
+    if (!state.liftSinkEnabled || state.tracks.length === 0) {
+        return;
+    }
+    
+    // Ensure climb rates are calculated lazily on demand
+    state.tracks.forEach(track => {
+        if (track.visible !== false && !track.hasClimbRates) {
+            lazyComputeClimbRates(track);
+        }
+    });
+    
+    const tMax = state.currentTime;
+    const tMin = state.currentTime - state.liftSinkWindow;
+    
+    if (state.liftSinkMode === 'raw') {
+        // Raw Trails Mode
+        state.tracks.forEach(track => {
+            if (track.visible === false) return;
+            const pts = track.points;
+            
+            // Filter points within the sliding time window
+            const windowPoints = pts.filter(p => p.time >= tMin && p.time <= tMax && p.climbRate !== undefined);
+            if (windowPoints.length < 2) return;
+            
+            let currentCategory = null;
+            let currentSegment = [];
+            
+            const drawSegment = (segment, category) => {
+                if (segment.length < 2) return;
+                let color = '#f59e0b'; // Neutral (amber yellow)
+                let weight = 2.5;
+                let opacity = 0.7;
+                if (category === 'climb') {
+                    color = '#10b981'; // Climb (emerald green)
+                    weight = 3;
+                    opacity = 0.8;
+                } else if (category === 'sink') {
+                    color = '#ef4444'; // Sink (rose red)
+                    weight = 3;
+                    opacity = 0.8;
+                }
+                
+                L.polyline(segment, {
+                    color: color,
+                    weight: weight,
+                    opacity: opacity,
+                    lineCap: 'round',
+                    lineJoin: 'round'
+                }).addTo(state.liftSinkLayerGroup);
+            };
+            
+            for (let i = 0; i < windowPoints.length; i++) {
+                const pt = windowPoints[i];
+                let cat = 'neutral';
+                if (pt.climbRate >= 0.5) cat = 'climb';
+                else if (pt.climbRate <= -0.5) cat = 'sink';
+                
+                if (currentCategory === null) {
+                    currentCategory = cat;
+                    currentSegment.push([pt.lat, pt.lng]);
+                } else if (currentCategory === cat) {
+                    currentSegment.push([pt.lat, pt.lng]);
+                } else {
+                    // Prevent gaps by connecting previous segment's end to current point
+                    currentSegment.push([pt.lat, pt.lng]);
+                    drawSegment(currentSegment, currentCategory);
+                    currentSegment = [[pt.lat, pt.lng]];
+                    currentCategory = cat;
+                }
+            }
+            if (currentSegment.length > 1) {
+                drawSegment(currentSegment, currentCategory);
+            }
+        });
+    } else {
+        // Grid Averages Mode
+        let refLat = 47.8;
+        const firstActiveTrack = state.tracks.find(t => t.visible !== false && t.points && t.points.length > 0);
+        if (firstActiveTrack) {
+            refLat = firstActiveTrack.points[0].lat;
+        }
+        
+        const latStep = state.liftSinkGridSize / 111000;
+        const lngStep = state.liftSinkGridSize / (111000 * Math.cos(refLat * Math.PI / 180));
+        
+        const grid = {};
+        
+        state.tracks.forEach(track => {
+            if (track.visible === false) return;
+            const pts = track.points;
+            const windowPoints = pts.filter(p => p.time >= tMin && p.time <= tMax && p.climbRate !== undefined);
+            windowPoints.forEach(p => {
+                const latIdx = Math.floor(p.lat / latStep);
+                const lngIdx = Math.floor(p.lng / lngStep);
+                const key = `${latIdx},${lngIdx}`;
+                if (!grid[key]) {
+                    grid[key] = {
+                        latIdx: latIdx,
+                        lngIdx: lngIdx,
+                        climbRates: [],
+                        pilots: new Set()
+                    };
+                }
+                grid[key].climbRates.push(p.climbRate);
+                grid[key].pilots.add(track.fullName || track.name);
+            });
+        });
+        
+        // Render grid rectangles meeting count threshold
+        Object.keys(grid).forEach(key => {
+            const cell = grid[key];
+            if (cell.climbRates.length < state.liftSinkMinPoints) return;
+            
+            const sum = cell.climbRates.reduce((a, b) => a + b, 0);
+            const avgClimb = sum / cell.climbRates.length;
+            
+            let color = '#f59e0b'; // Neutral (amber yellow)
+            let typeLabel = 'Neutral Air';
+            if (avgClimb >= 0.5) {
+                color = '#10b981'; // Climb (emerald green)
+                typeLabel = 'Thermal Lift Area';
+            } else if (avgClimb <= -0.5) {
+                color = '#ef4444'; // Sink (rose red)
+                typeLabel = 'Sink Area';
+            }
+            
+            const lat0 = cell.latIdx * latStep;
+            const lat1 = (cell.latIdx + 1) * latStep;
+            const lng0 = cell.lngIdx * lngStep;
+            const lng1 = (cell.lngIdx + 1) * lngStep;
+            
+            const bounds = [
+                [lat0, lng0],
+                [lat1, lng1]
+            ];
+            
+            const rect = L.rectangle(bounds, {
+                fillColor: color,
+                fillOpacity: 0.4,
+                color: color,
+                weight: 1,
+                opacity: 0.2
+            });
+            
+            rect.on('mouseover', () => {
+                rect.setStyle({ weight: 2.5, opacity: 0.8, fillOpacity: 0.55 });
+            });
+            rect.on('mouseout', () => {
+                rect.setStyle({ weight: 1, opacity: 0.2, fillOpacity: 0.4 });
+            });
+            
+            const pilotsList = Array.from(cell.pilots).join(', ');
+            const sign = avgClimb > 0 ? '+' : '';
+            const popupContent = `
+                <div class="liftsink-popup" style="font-family: inherit;">
+                    <h4 style="margin: 0 0 6px 0; color: ${color}; font-size: 0.9rem; font-weight: 600;">
+                        ${typeLabel}
+                    </h4>
+                    <div style="font-size: 0.8rem; line-height: 1.45; color: var(--text-main);">
+                        <div><strong>Avg Vario:</strong> <span style="font-family: monospace; font-weight: bold; color: ${color};">${sign}${avgClimb.toFixed(2)} m/s</span></div>
+                        <div><strong>Trackpoints:</strong> <span style="font-family: monospace;">${cell.climbRates.length}</span></div>
+                        <div><strong>Pilots:</strong> <span style="font-family: monospace;">${cell.pilots.size}</span></div>
+                        <div style="margin-top: 4px; font-size: 0.75rem; color: var(--text-muted); border-top: 1px solid var(--border); padding-top: 4px; max-width: 200px; word-wrap: break-word;">
+                            <strong>Pilots active:</strong> ${pilotsList}
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            rect.bindPopup(popupContent);
+            rect.addTo(state.liftSinkLayerGroup);
+        });
+    }
+}
+
+/**
+ * Binds UI inputs and settings controls for Lift/Sink Map.
+ * Syncs settings, manages dynamic visibility of controls, and handles localStorage.
+ */
+function initLiftSinkControls() {
+    const chkEnable = document.getElementById('chk-liftsink-enable');
+    const selectMode = document.getElementById('select-liftsink-mode');
+    const slideWindow = document.getElementById('slide-liftsink-window');
+    const labelWindow = document.getElementById('label-liftsink-window');
+    const slideGridSize = document.getElementById('slide-liftsink-gridsize');
+    const labelGridSize = document.getElementById('label-liftsink-gridsize');
+    const slideMinPts = document.getElementById('slide-liftsink-minpts');
+    const labelMinPts = document.getElementById('label-liftsink-minpts');
+    const wrapperControls = document.getElementById('liftsink-controls-wrapper');
+    const wrapperAverage = document.getElementById('average-settings-wrapper');
+
+    // Restore settings from localStorage
+    try {
+        const storedEnabled = localStorage.getItem('pg-liftsink-enabled');
+        if (storedEnabled !== null) state.liftSinkEnabled = storedEnabled === 'true';
+        
+        const storedMode = localStorage.getItem('pg-liftsink-mode');
+        if (storedMode !== null) state.liftSinkMode = storedMode;
+        
+        const storedWindow = localStorage.getItem('pg-liftsink-window');
+        if (storedWindow !== null) state.liftSinkWindow = parseInt(storedWindow, 10);
+        
+        const storedGridSize = localStorage.getItem('pg-liftsink-gridsize');
+        if (storedGridSize !== null) state.liftSinkGridSize = parseInt(storedGridSize, 10);
+        
+        const storedMinPoints = localStorage.getItem('pg-liftsink-minpts');
+        if (storedMinPoints !== null) state.liftSinkMinPoints = parseInt(storedMinPoints, 10);
+    } catch (e) {
+        console.warn('Failed to restore lift/sink settings', e);
+    }
+
+    // Apply state to UI
+    if (chkEnable) chkEnable.checked = state.liftSinkEnabled;
+    if (selectMode) selectMode.value = state.liftSinkMode;
+    if (slideWindow) slideWindow.value = Math.round(state.liftSinkWindow / 60);
+    if (labelWindow) labelWindow.textContent = `${Math.round(state.liftSinkWindow / 60)} min`;
+    if (slideGridSize) slideGridSize.value = state.liftSinkGridSize;
+    if (labelGridSize) labelGridSize.textContent = `${state.liftSinkGridSize}m`;
+    if (slideMinPts) slideMinPts.value = state.liftSinkMinPoints;
+    if (labelMinPts) labelMinPts.textContent = state.liftSinkMinPoints.toString();
+
+    const updateVisibility = () => {
+        if (wrapperControls) {
+            wrapperControls.style.display = state.liftSinkEnabled ? 'flex' : 'none';
+        }
+        if (wrapperAverage) {
+            wrapperAverage.style.display = (state.liftSinkEnabled && state.liftSinkMode === 'average') ? 'flex' : 'none';
+        }
+    };
+    updateVisibility();
+
+    // Event Listeners
+    if (chkEnable) {
+        chkEnable.addEventListener('change', (e) => {
+            state.liftSinkEnabled = e.target.checked;
+            try { localStorage.setItem('pg-liftsink-enabled', state.liftSinkEnabled); } catch(err) {}
+            updateVisibility();
+            updateLiftSinkOverlay();
+        });
+    }
+
+    if (selectMode) {
+        selectMode.addEventListener('change', (e) => {
+            state.liftSinkMode = e.target.value;
+            try { localStorage.setItem('pg-liftsink-mode', state.liftSinkMode); } catch(err) {}
+            updateVisibility();
+            updateLiftSinkOverlay();
+        });
+    }
+
+    if (slideWindow) {
+        slideWindow.addEventListener('input', (e) => {
+            const val = parseInt(e.target.value, 10);
+            state.liftSinkWindow = val * 60;
+            if (labelWindow) labelWindow.textContent = `${val} min`;
+            try { localStorage.setItem('pg-liftsink-window', state.liftSinkWindow); } catch(err) {}
+            updateLiftSinkOverlay();
+        });
+    }
+
+    if (slideGridSize) {
+        slideGridSize.addEventListener('input', (e) => {
+            const val = parseInt(e.target.value, 10);
+            state.liftSinkGridSize = val;
+            if (labelGridSize) labelGridSize.textContent = `${val}m`;
+            try { localStorage.setItem('pg-liftsink-gridsize', state.liftSinkGridSize); } catch(err) {}
+            updateLiftSinkOverlay();
+        });
+    }
+
+    if (slideMinPts) {
+        slideMinPts.addEventListener('input', (e) => {
+            const val = parseInt(e.target.value, 10);
+            state.liftSinkMinPoints = val;
+            if (labelMinPts) labelMinPts.textContent = val.toString();
+            try { localStorage.setItem('pg-liftsink-minpts', state.liftSinkMinPoints); } catch(err) {}
+            updateLiftSinkOverlay();
         });
     }
 }
