@@ -467,17 +467,57 @@ input[type=range]:disabled::-webkit-slider-thumb { background: var(--text-muted)
 
 .pilot-marker-icon { background: none; border: none; }
 .pilot-marker-dot {
-    width: 12px; height: 12px; position: absolute; top: -7.25px; left: -6px;
-    transform-origin: 50% 60.4%;
+    width: 18px; height: 18px; position: absolute; top: -7.13px; left: -9px;
+    transform-origin: 50% 39.6%;
     transition: transform 0.1s linear; /* Smooth heading rotation transition */
 }
 .pilot-marker-label {
-    position: absolute; top: 5.75px; left: 50%; transform: translateX(-50%);
+    position: absolute; top: 11.13px; left: 50%; transform: translateX(-50%);
     background: rgba(0,0,0,0.7); color: white; padding: 2px 6px; border-radius: 4px;
     font-size: 10px; font-weight: bold; white-space: nowrap;
 }
 .liftsink-active .pilot-marker-label {
     display: none !important;
+}
+
+/* Custom styling for Leaflet controls to match premium dark/glassmorphic theme */
+.leaflet-control-layers {
+    background: rgba(30, 41, 59, 0.8) !important;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border: 1px solid var(--border) !important;
+    border-radius: 6px !important;
+    color: var(--text-main) !important;
+    font-family: inherit !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
+}
+.leaflet-control-layers-toggle {
+    filter: invert(1); /* Invert icon color to white for dark mode */
+}
+.leaflet-control-layers-expanded {
+    padding: 8px 12px !important;
+}
+.leaflet-control-layers label {
+    font-size: 0.8rem !important;
+    font-weight: 500 !important;
+    cursor: pointer;
+    margin-bottom: 4px;
+}
+.leaflet-control-scale {
+    margin-bottom: 12px !important;
+    margin-left: 12px !important;
+}
+.leaflet-control-scale-line {
+    background: rgba(30, 41, 59, 0.6) !important;
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    border: 1px solid var(--border) !important;
+    border-top: none !important;
+    color: var(--text-main) !important;
+    font-family: inherit !important;
+    font-size: 9px !important;
+    font-weight: bold !important;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.2);
 }
 
 .btn-side-overlay {

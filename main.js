@@ -140,10 +140,29 @@ function initApp() {
     // Setup Map
     state.map = L.map('map').setView([46.8, 8.2], 8); // Default to Switzerland
     
-    L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+    // Define base map tile layers
+    const topoMap = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
         maxZoom: 17,
         attribution: 'Map data: &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, SRTM | Map style: &copy; <a href="https://opentopomap.org">OpenTopoMap</a> (CC-BY-SA)'
-    }).addTo(state.map);
+    });
+    
+    const satelliteMap = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+        maxZoom: 19,
+        attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+    });
+
+    // Add default topo map to the map
+    topoMap.addTo(state.map);
+
+    // Layer control for switching maps
+    const baseMaps = {
+        "Topo Map": topoMap,
+        "Satellite Map": satelliteMap
+    };
+    L.control.layers(baseMaps).addTo(state.map);
+
+    // Add map scale control
+    L.control.scale({ position: 'bottomleft' }).addTo(state.map);
 
     // Lift/Sink layer group
     state.liftSinkLayerGroup = L.featureGroup().addTo(state.map);
@@ -1248,50 +1267,50 @@ function addTrackToState(rawName, points, terrainProfile = null) {
         initialHeading = rad * 180 / Math.PI;
     }
 
-    // Calculate dynamic pilot marker sizes based on current map zoom
-    let targetSize = 12;
-    let topOffset = 7.25;
-    let leftOffset = 6;
-    let labelTop = 5.75;
+    // Calculate dynamic pilot marker sizes based on current map zoom (minimum size is 18px now, 150% of 12px)
+    let targetSize = 18;
+    let topOffset = 7.13;
+    let leftOffset = 9;
+    let labelTop = 11.13;
     if (state.map) {
         const zoom = state.map.getZoom();
         const lat = points[0].lat;
         const metersPerPixel = (40075016.686 * Math.cos(lat * Math.PI / 180)) / (256 * Math.pow(2, zoom));
         const size10m = 10 / metersPerPixel;
-        targetSize = Math.max(12, size10m);
-        topOffset = targetSize * 0.604;
+        targetSize = Math.max(18, size10m);
+        topOffset = targetSize * 0.396;
         leftOffset = targetSize * 0.5;
-        labelTop = (targetSize * 0.146) + 4;
+        labelTop = (targetSize * 0.396) + 4;
     }
 
     // Dynamic Pilot Marker (Paraglider Wing shape - Symmetrical Top-Down View)
     const iconHtml = `
         <div class="pilot-marker-icon" title="${fullName}">
-            <div class="pilot-marker-dot" style="transform: rotate(${initialHeading}deg); width: ${targetSize}px; height: ${targetSize}px; top: -${topOffset}px; left: -${leftOffset}px; transform-origin: 50% 60.4%;">
+            <div class="pilot-marker-dot" style="transform: rotate(${initialHeading}deg); width: ${targetSize}px; height: ${targetSize}px; top: -${topOffset}px; left: -${leftOffset}px; transform-origin: 50% 39.6%;">
                 <svg width="${targetSize}" height="${targetSize}" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <!-- Lines connecting wing to pilot harness -->
-                    <line x1="2" y1="11" x2="12" y2="14.5" stroke="rgba(15, 23, 42, 0.35)" stroke-width="0.5" />
-                    <line x1="6" y1="8" x2="12" y2="14.5" stroke="rgba(15, 23, 42, 0.35)" stroke-width="0.5" />
-                    <line x1="9" y1="5" x2="12" y2="14.5" stroke="rgba(15, 23, 42, 0.35)" stroke-width="0.5" />
-                    <line x1="12" y1="4.5" x2="12" y2="14.5" stroke="rgba(15, 23, 42, 0.35)" stroke-width="0.5" />
-                    <line x1="15" y1="5" x2="12" y2="14.5" stroke="rgba(15, 23, 42, 0.35)" stroke-width="0.5" />
-                    <line x1="18" y1="8" x2="12" y2="14.5" stroke="rgba(15, 23, 42, 0.35)" stroke-width="0.5" />
-                    <line x1="22" y1="11" x2="12" y2="14.5" stroke="rgba(15, 23, 42, 0.35)" stroke-width="0.5" />
+                    <line x1="2" y1="12" x2="12" y2="9.5" stroke="rgba(15, 23, 42, 0.35)" stroke-width="0.5" />
+                    <line x1="7" y1="8.3" x2="12" y2="9.5" stroke="rgba(15, 23, 42, 0.35)" stroke-width="0.5" />
+                    <line x1="9.5" y1="7.3" x2="12" y2="9.5" stroke="rgba(15, 23, 42, 0.35)" stroke-width="0.5" />
+                    <line x1="12" y1="7" x2="12" y2="9.5" stroke="rgba(15, 23, 42, 0.35)" stroke-width="0.5" />
+                    <line x1="14.5" y1="7.3" x2="12" y2="9.5" stroke="rgba(15, 23, 42, 0.35)" stroke-width="0.5" />
+                    <line x1="17" y1="8.3" x2="12" y2="9.5" stroke="rgba(15, 23, 42, 0.35)" stroke-width="0.5" />
+                    <line x1="22" y1="12" x2="12" y2="9.5" stroke="rgba(15, 23, 42, 0.35)" stroke-width="0.5" />
                     
-                    <!-- Pod Harness (Pilot) -->
-                    <path d="M 12 11 C 13.2 11, 13.8 12.5, 13.8 14.5 C 13.8 16.5, 13.2 18, 12 18 C 10.8 18, 10.2 16.5, 10.2 14.5 C 10.2 12.5, 10.8 11, 12 11 Z" fill="#0f172a" stroke="white" stroke-width="0.75" />
+                    <!-- Pod Harness (Pilot) - sticking out front and back, tail sticks out farther than foot from CG at 9.5 -->
+                    <path d="M 12 2 C 13.5 2, 13.8 6.5, 13.8 9.5 C 13.8 13.5, 13.3 19, 12 19 C 10.7 19, 10.2 13.5, 10.2 9.5 C 10.2 6.5, 10.5 2, 12 2 Z" fill="#0f172a" stroke="white" stroke-width="0.75" />
 
-                    <!-- Paraglider Wing Canopy -->
-                    <path d="M 2 11 Q 12 3 22 11 Q 12 6 2 11 Z" fill="${color}" stroke="#0f172a" stroke-width="1.25" stroke-linejoin="round" />
+                    <!-- Paraglider Wing Canopy - drawn on top of harness so it comes out front and back -->
+                    <path d="M 2 12 Q 12 4 22 12 Q 12 7 2 12 Z" fill="${color}" stroke="#0f172a" stroke-width="1.25" stroke-linejoin="round" />
 
                     <!-- Internal cell details (ribs) for realistic top view -->
-                    <line x1="12" y1="3" x2="12" y2="6" stroke="rgba(255,255,255,0.4)" stroke-width="0.55" />
-                    <line x1="9.5" y1="3.5" x2="9.5" y2="6.3" stroke="rgba(255,255,255,0.4)" stroke-width="0.55" />
-                    <line x1="7" y1="5" x2="7" y2="7.3" stroke="rgba(255,255,255,0.4)" stroke-width="0.55" />
-                    <line x1="4.5" y1="7.5" x2="4.5" y2="8.8" stroke="rgba(255,255,255,0.4)" stroke-width="0.55" />
-                    <line x1="14.5" y1="3.5" x2="14.5" y2="6.3" stroke="rgba(255,255,255,0.4)" stroke-width="0.55" />
-                    <line x1="17" y1="5" x2="17" y2="7.3" stroke="rgba(255,255,255,0.4)" stroke-width="0.55" />
-                    <line x1="19.5" y1="7.5" x2="19.5" y2="8.8" stroke="rgba(255,255,255,0.4)" stroke-width="0.55" />
+                    <line x1="12" y1="4" x2="12" y2="7" stroke="rgba(255,255,255,0.4)" stroke-width="0.55" />
+                    <line x1="9.5" y1="4.5" x2="9.5" y2="7.3" stroke="rgba(255,255,255,0.4)" stroke-width="0.55" />
+                    <line x1="7" y1="6" x2="7" y2="8.3" stroke="rgba(255,255,255,0.4)" stroke-width="0.55" />
+                    <line x1="4.5" y1="8.5" x2="4.5" y2="9.8" stroke="rgba(255,255,255,0.4)" stroke-width="0.55" />
+                    <line x1="14.5" y1="4.5" x2="14.5" y2="7.3" stroke="rgba(255,255,255,0.4)" stroke-width="0.55" />
+                    <line x1="17" y1="6" x2="17" y2="8.3" stroke="rgba(255,255,255,0.4)" stroke-width="0.55" />
+                    <line x1="19.5" y1="8.5" x2="19.5" y2="9.8" stroke="rgba(255,255,255,0.4)" stroke-width="0.55" />
                 </svg>
             </div>
             <div class="pilot-marker-label" style="background-color: ${color}; top: ${labelTop}px;">${initials}</div>
@@ -1344,11 +1363,11 @@ function updateMarkerSizes() {
     // 10 meters in pixels
     const size10m = 10 / metersPerPixel;
     
-    // Scale size: minimum 12px, otherwise matching 10m
-    const targetSize = Math.max(12, size10m);
-    const topOffset = targetSize * 0.604;
+    // Scale size: minimum 18px, otherwise matching 10m
+    const targetSize = Math.max(18, size10m);
+    const topOffset = targetSize * 0.396;
     const leftOffset = targetSize * 0.5;
-    const labelTop = (targetSize * 0.146) + 4;
+    const labelTop = (targetSize * 0.396) + 4;
     
     state.tracks.forEach(track => {
         if (!track.marker) return;
