@@ -1,5 +1,5 @@
 import { parseIGC, parseGPX, parseKML, ensureTimestamps } from './shared/parsers.js';
-import { haversineDistance } from './shared/geo-math.js';
+import { haversineDistance, bearing } from './shared/geo-math.js';
 import { parseWaypointFile } from './shared/waypoint-parsers.js';
 import { analyzeTactics, calculateRemainingLegs, getOptimizedTaskDistances } from './shared/tactics.js';
 import { SideView } from './side-view.js';
@@ -1237,10 +1237,19 @@ function addTrackToState(rawName, points, terrainProfile = null) {
         opacity: 0.6 
     }).addTo(layerGroup);
 
+    // Calculate initial heading from first two points
+    let initialHeading = 0;
+    if (points && points.length > 1) {
+        const rad = bearing(points[0], points[1]);
+        initialHeading = rad * 180 / Math.PI;
+    }
+
     // Dynamic Pilot Marker
     const iconHtml = `
         <div class="pilot-marker-icon" title="${fullName}">
-            <div class="pilot-marker-dot" style="background-color: ${color}; border-color: white;"></div>
+            <div class="pilot-marker-dot" style="background-color: ${color}; border-color: white; transform: rotate(${initialHeading}deg);">
+                <div class="pilot-marker-arrow"></div>
+            </div>
             <div class="pilot-marker-label" style="background-color: ${color};">${initials}</div>
         </div>
     `;
@@ -1265,7 +1274,8 @@ function addTrackToState(rawName, points, terrainProfile = null) {
         layerGroup,
         polyline,
         marker,
-        currentPosIndex: 0
+        currentPosIndex: 0,
+        lastHeading: initialHeading
     };
 
     state.tracks.push(trackObj);
@@ -1753,6 +1763,31 @@ function updateMaxSpeedMarker(track) {
 function updatePilotMarker(track, currentPos, prevPos) {
     track.marker.setLatLng([currentPos.lat, currentPos.lng]);
     track.currentAlt = currentPos.alt;
+    
+    // Rotate dot based on heading
+    let heading = track.lastHeading !== undefined ? track.lastHeading : 0;
+    if (prevPos) {
+        const dist = haversineDistance(prevPos, currentPos);
+        if (dist > 0.005) { // at least 5 meters in 10s (~1.8 km/h)
+            const rad = bearing(prevPos, currentPos);
+            heading = rad * 180 / Math.PI;
+            track.lastHeading = heading;
+        }
+    } else if (track.points && track.points.length > 1) {
+        const p1 = track.points[0];
+        const p2 = track.points[1];
+        const rad = bearing(p1, p2);
+        heading = rad * 180 / Math.PI;
+        track.lastHeading = heading;
+    }
+    
+    const markerEl = track.marker.getElement();
+    if (markerEl) {
+        const dot = markerEl.querySelector('.pilot-marker-dot');
+        if (dot) {
+            dot.style.transform = `rotate(${heading}deg)`;
+        }
+    }
     
     // Snail trail animation
     if (track.currentPosIndex !== undefined) {
