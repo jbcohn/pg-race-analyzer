@@ -1,0 +1,124 @@
+# 	Id 	Name 	Nat 	Glider 	Sponsor 	Total 	T1 	T2 	T3 	T4 	T5 	T7
+1 	3332 	William Pardis 	PHL 	Ozone Enzo 3 / Ozone Submarine 	Pardis Bros 	4226.9 	913.2 	985.3 	0.0 942.6 	538.0 952.2 	822.1 	968.3
+2 	2561 	Mitch Riley 	USA 	Ozone Enzo 3 / Ozone Submarine 	Ozone 	4214.0 	886.3 	991.0 	544.5 968.6 	0.0 147.2 	828.2 	964.0
+3 	483 	peter thompson 	USA 	Ozone Enzo3 / Ozone Gr5 	West Side Lighting 	4201.9 	893.5 	985.3 	383.0 947.0 	975.5 	0.0 388.9 	964.6
+4 	505 	Evan Bouchier 	USA 	Ozone Enzo 3 / Ozone Submarine 	Belcourt Enterprises 	4176.0 	0.0 831.0 	984.0 	452.5 940.9 	946.7 	819.6 	973.2
+5 	808 	Josh Cohn 	USA 	Ozone Enzo 3 / Gin Gr5 	Litestep.us, Belcourt Ent., Bozeman Paragliding 	4163.1 	884.8 	983.1 	531.4 945.2 	0.0 880.3 	820.1 	943.7
+6 	284 	Colin Rathbun 	VGB 	Ozone Enzo3 / Ozone Sub 	Aeropost.com 	4160.9 	901.2 	982.8 	380.2 940.2 	958.4 	0.0 39.8 	938.3
+7 	64 	Violeta Jimenez 	USA 	Ozone Enzo 3 / Ozone Submarine 		4156.8 	456.8 868.0 	978.3 	0.0 67.5 	955.6 	811.6 	954.5
+8 	28 	Michal Hammel 	USA 	Ozone Enzo 3 / Gin Gr5 	Galen 	4118.6 	872.1 	530.3 941.2 	0.0 482.5 	958.4 	800.9 	956.9
+9 	6 	Matthew Beechinor 	USA 	Ozone Zeno2 / Ozone Submarine 	- 	4117.8 	445.7 846.8 	986.2 	0.0 124.2 	931.2 	817.1 	937.6
+10 	358 	Alex Popow 	VEN 	Niviuk X-One / Gin Genie Race 5 		4117.3 	881.5 	513.1 918.7 	927.9 	0.0 920.8 	836.7 	958.1
+11 	4 	Alexia Fischer 	USA 	Ozone Enzo 3 / Ozone Submarine 	Bozeman Paragliding, Cloudsurf Towing and SIV 	4114.6 	294.6 846.1 	980.9 	930.6 	953.7 	0.0 681.0 	954.8
+12 	411 	Jenny Oneil 	USA 	Ozone Enzo 3 / Ozone Submarine 		4087.3 	443.4 842.6 	953.5 	0.0 814.8 	928.3 	811.9 	950.2
+13 	31 	Austin Cox 	USA 	Ozone Enzo 3 / Ozone Submarine 	NORTHWEST PARAGLIDING 	4086.1 	865.8 	976.9 	353.6 874.5 	931.7 	0.0 542.2 	958.1
+14 	1320 	Reavis Sutphin-Gray 	USA 	Ozone Enzo 3 / Kortel Kanibal Race Ii 	Eagle Paragliding 	4052.4 	873.7 	986.6 	0.0 708.3 	943.3 	355.9 736.8 	892.9
+15 	4242 	Cedar Wright 	USA 	Ozone Enzo 3 / Ozone Submarine 	YOLO FREE SOLO 	4038.7 	880.9 	983.1 	0.0 514.9 	968.2 	728.2 	478.3 847.4
+16 	12 	Chaeden Luebberke 	USA 	Ozone Enzo 3 / Gin Gr5 	Reno-Tahoe Paragliding 	3999.8 	814.1 	351.3 879.6 	941.5 	934.8 	0.0 258.6 	958.1
+17 	200 	Mike Lester 	USA 	Ozone Enzo 3 / Ozone Submarine 	thatgamecompany 	3984.6 	866.3 	973.7 	936.8 	946.3 	261.5 549.9 	0.0 40.9
+18 	37 	Hiroaki Kobayashi 	JPN 	Ozone Enzo 3 / Ozone Submarine 	Sankei Giken Kogyo Co., Ltd. / Marusada AMC / NEWMAN TECHNOLOGY INC 	3975.5 	838.0 	960.8 	0.0 633.7 	917.3 	815.2 	444.2 787.0
+19 	321 	Jose Miniet 	CUB 	Ozone Enzo 3 / Ozone Submarine 	- 	3970.1 	818.0 	963.2 	0.0 427.4 	480.0 849.6 	755.2 	953.7
+20 	579 	Jeremy Wilstein 	USA 	Ozone Enzo 3 / Ozone Submarine - Orange 	ME 	3945.2 	233.8 448.8 	975.6 	999.3 	0.0 220.3 	817.4 	919.1
+21 	406 	Andy Macrae 	USA 	Ozone Enzo 3 / Gin Gr5 	Bozeman Paragliding 	3934.3 	224.9 645.8 	936.0 	931.4 	932.7 	0.0 565.0 	909.3
+22 	30 	Bill Belcourt 	USA 	Ozone Enzo 3 / Ozone Submarine 	Ozone, Flytec, TAKA 	3931.6 	755.6 	969.9 	937.2 	943.7 	0.0 350.7 	325.2 811.6
+23 	127 	Cody Mittanck 	USA 	Ozone Enzo 3 / Ozone Sub 	CNL Environmental 	3922.0 	0.0 269.4 	986.9 	921.4 	954.2 	726.6 	332.9 696.8
+24 	24 	Matthew Henzi 	USA 	Ozone Enzo 3 / Ozone Submarine 	Cloudsurf Towing and Maneuvers Clinics 	3920.0 	869.8 	989.0 	934.7 	994.4 	132.1 277.8 	0.0 105.2
+25 	11 	Enes Mentese 	USA 	Ozone Enzo 3 / Gin Gr5 	Mentese Labs 	3914.1 	0.0 304.3 	971.0 	283.5 589.5 	910.9 	813.4 	935.3
+26 	8675 	Ross Desmond 	USA 	Ozone Enzo 3 / Ozone Submarine 	Me 	3913.2 	774.2 	980.4 	0.0 126.6 	906.1 	813.1 	439.4 778.5
+27 	1111 	Carlos Avila 	USA 	Ozone Enzo3 / Ozone Submarine Red 	Self 	3843.3 	824.7 	981.0 	0.0 24.5 	939.8 	248.1 513.8 	849.7
+28 	811 	Christopher Moody 	USA 	Ozone Enzo 3 / Gin Gr5 	Jackson Hole Paragliding 	3830.0 	873.4 	0.0 356.6 	925.1 	947.7 	142.8 301.9 	941.0
+29 	101 	Francisco Henriquez 	USA 	Ozone Enzo3 / Gin Race 5 		3808.2 	227.7 654.0 	958.0 	804.8 	908.7 	0.0 282.5 	909.0
+30 	381 	FRANCISCO MANTARAS 	ARG 	Ozone Enzo / Ozone Submarine 	High End Construction, Inc. 	3802.6 	758.0 	948.6 	207.8 513.9 	968.0 	0.0 318.9 	920.2
+31 	3111 	Matthew Pardis 	PHI 	Ozone Zeno 2 / Ozone Submarine 	Pardis Bros 	3793.3 	0.0 711.9 	811.1 	860.6 	930.0 	815.5 	376.1 787.4
+32 	1313 	Igor Merk 	EST 	Ozone Zeno 2 / Niviuk Arrow 	FlyTheEarth 	3763.7 	791.3 	941.8 	300.9 744.0 	868.1 	0.0 51.6 	861.6
+33 	378 	George Milheim 	USA 	Ozone Enzo 3 / Gin Gr5 	bozeman paragliding 	3705.3 	840.2 	816.9 	0.0 712.7 	415.9 736.2 	742.0 	890.3
+34 	3 	Korey Curtis 	USA 	Ozone Enzo 3 / Ozone Submarine 	BeLikeBill 	3649.9 	0.0 351.7 	942.7 	804.7 	931.3 	136.1 358.1 	835.1
+35 	5368 	Brian Fletcher 	USA 	Ozone Enzo 3 / Kortel Kannibal Race2 		3649.6 	842.4 	975.3 	939.5 	0.0 20.6 	26.8 56.1 	865.6
+36 	19 	Galen Kirkpatrick 	USA 	Ozone Enzo 3 / Ozone Submarine 2 	Cloudbase Mayhem, XC TRACER, Ozone 	3647.4 	902.3 	0.0 331.3 	278.1 497.7 	913.5 	560.4 	993.1
+37 	7 	Michael Graef 	USA 	Ozone Zeno 2 / Gin Genie Lite 	Chicago Paragliding 	3639.5 	749.7 	730.1 	288.0 712.3 	930.9 	0.0 29.3 	940.8
+38 	181 	Schuyler Heath 	USA 	Ozone Enzo 3 / Ozone Submarine 		3597.6 	624.6 	375.1 673.2 	918.2 	873.9 	805.8 	0.0 590.4
+39 	36 	Bianca Heinrich 	USA 	Ozone Zeno 2 / Gin Genie Race 5 	Bozeman Paragliding, Limitless Skies 	3592.3 	805.5 	801.0 	299.7 741.1 	860.5 	0.0 206.6 	825.6
+40 	867 	Rob Curran 	USA 	Ozone Zeno 2 / Kortel Kannibal 	Cloudsurf Towing and SIV, Bill Belcourt 	3563.0 	775.8 	783.6 	186.4 460.9 	902.4 	0.0 105.6 	914.8
+41 	818 	Trevor MacMurray 	CAN 	Ozone Zeno 2 / Advance Impress 4 		3512.2 	837.2 	900.9 	44.1 109.1 	894.5 	0.0 54.3 	835.5
+42 	384 	William Stites 	USA 	Ozone Enzo 3 / Gin Race 5 	MMAI 	3491.7 	227.4 436.6 	976.1 	515.2 	0.0 37.1 	836.1 	936.9
+43 	512 	Ruard de Bruyn 	ZAF 	Triple Seven Gambit / Gin Race 5 	IndemniFly, Paragliding Logbook, Hi5 Paragliding 	3490.9 	734.0 	776.6 	888.7 	0.0 20.6 	176.1 369.1 	915.5
+44 	804 	John Tosti 	USA 	Ozone Enzo 3 / Gin Gr5 	Reno/Tahoe Paragliding 	3463.7 	802.4 	857.7 	187.7 464.1 	770.7 	0.0 356.3 	845.2
+45 	305 	Daniel Zaragoza 	VEN 	Ozone Enzo 3 / Gin Genie Race 5 		3366.2 	772.6 	822.6 	801.1 	0.0 33.0 	20.0 42.0 	949.9
+46 	255 	Vinay Shah 	USA 	Ozone Zeno 2 / Gin Genie Race 5 		3355.7 	732.8 	801.7 	195.4 483.3 	821.5 	0.0 299.6 	804.3
+47 	122 	Matt Hoffman 	USA 	Niviuk Icepeak X-One / Woodyvalley Xr-7 		3323.1 	841.4 	935.1 	720.5 	0.0 46.0 	123.1 258.0 	703.0
+48 	716 	Yun Lin 	USA 	Niviuk Icepeak X-One / Gin Genie Race 5 	Seattle Paragliding 	3298.8 	770.3 	681.8 	0.0 487.4 	382.9 677.8 	716.7 	747.1
+49 	971 	Brad Gunnuscio 	USA 	Ozone Enzo3 / Gin Genie Race 5 	Siv clinic .com 	3280.5 	764.9 	937.4 	286.0 508.7 	0.0 61.0 	469.7 	822.5
+50 	562 	Ben Pedersen-Wedlock 	USA 	Ozone Enzo 3 / Gin Genie Race 4 		3241.9 	726.6 	946.9 	722.0 	8.3 20.6 	0.0 	838.1
+51 	174 	Mark Simpson 	NZL 	Ozone Enzo 3 / Ozone Submarine 	Telluride Realty, Hallie 	3226.9 	867.0 	0.0 24.0 	675.7 	917.7 	745.1 	21.4 38.5
+52 	141 	Bill Hughes 	USA 	Ozone Enzo 3 / Gin Genie Race 5 	Super Fly 	3220.0 	605.7 	337.0 603.4 	721.3 	0.0 20.6 	798.5 	757.5
+53 	7770 	Jarotron Krupa 	VGB 	777 Gliders Gambit / Ozone Submarine 	777usa, Chicago Paragliding, naviter, wifey 	3198.0 	0.0 375.6 	731.8 	741.5 	259.0 541.5 	646.2 	819.5
+54 	713 	Joshua Phillips 	USA 	Ozone Enzo3 / Gin Gr5 	Super Fly Paragliding 	3157.9 	451.6 	890.3 	732.5 	936.0 	147.5 310.2 	0.0 285.3
+55 	210 	Brett Yeates 	CAN 	Ozone Zeno 2 / Gin Gr5 		3149.3 	774.7 	814.2 	250.3 445.2 	0.0 20.6 	464.4 	845.7
+56 	530 	Douglas Anawalt 	USA 	Ozone Zeno 2 / Advance Impress 4 		3139.8 	662.1 	800.9 	43.9 108.6 	825.4 	0.0 29.3 	807.5
+57 	259 	Owen Shoemaker 	USA 	Ozone Zeno 2 / Ozone Submarine 	NW Paragliding 	3111.2 	757.4 	953.5 	876.4 	495.8 	28.1 59.1 	0.0 49.5
+58 	420 	Ari Delashmutt 	USA 	Ozone Enzo 3 / Advance Impress4 	Ari in the Air 	3109.8 	815.0 	847.9 	477.5 	0.0 32.8 	143.7 301.1 	825.7
+59 	633 	Jerad Hoy 	USA 	Ozone Zeno 2 / Gin Gr5 	Bozeman Paragliding 	3098.4 	799.5 	949.8 	499.1 	26.5 65.9 	0.0 29.3 	823.5
+60 	444 	JORGE ATRAMIZ 	VEN 	Ozone Zeno 2 / Ozone Forza2 	Ozone 	3096.9 	173.4 498.0 	806.3 	700.0 	821.1 	0.0 48.9 	596.1
+61 	5 	Cj Jessett 	USA 	Ozone Zeno 2 / Kortel Kannibal 		3016.3 	153.0 439.4 	709.1 	586.4 	822.0 	0.0 29.3 	745.8
+62 	318 	Lynsey Haynes 	CAN 	Ozone Zeno 2 / Gin Genie Race 5 	It's me, hi 	3001.4 	803.1 	171.9 430.5 	664.1 	554.3 	0.0 303.2 	808.0
+63 	322 	donizete lemos 	USA 	Ozone Enzo3 / Ozone Sub 	Wellys restaurant 	2954.1 	446.3 	0.0 326.7 	927.7 	233.4 419.3 	388.7 	958.0
+64 	2025 	Scott Harding 	USA 	Ozone Zeno 2 / Advance Impress 4 	ThermalTracker.com 	2929.5 	115.3 219.1 	684.0 	0.0 115.4 	674.2 	737.5 	718.5
+65 	307 	Wade Lippincott 	USA 	Gin Zeno 2 / Gin Race 5 	Atlas 	2891.7 	652.4 	241.1 603.7 	612.1 	676.9 	0.0 	709.2
+66 	9999 	Bill Lemon 	USA 	Ozone Lyght / Gin Genie 		2878.6 	740.1 	687.2 	19.2 34.1 	0.0 21.9 	691.7 	740.4
+67 	40 	Glen Stevens 	NZL 	Ozone Zeno 2 / Advance Impress 4 	Cloudbase Paragliding NZ 	2847.7 	78.6 225.7 	807.0 	737.7 	860.1 	0.0 29.3 	364.3
+68 	1841 	louis coulombe 	USA 	Ozone Zeno 2 / Advance Impress 4 		2800.3 	573.9 	780.7 	128.7 318.3 	704.3 	0.0 244.4 	612.7
+69 	88 	Eric Ams 	USA 	Ozone Zeno 2 / Gin Genie Race 3 		2787.7 	811.9 	415.2 	710.8 	0.0 59.8 	96.1 201.5 	753.7
+70 	860 	Brad Hauge 	USA 	Ozone Zeno 2 / Gin Gr5 	Bozeman Paragliding 	2716.7 	839.2 	514.7 	499.9 	0.0 20.6 	20.2 42.3 	842.7
+71 	52 	nate scales 	USA 	Ozone Zeno 2 / Gin Genie Race 5 Update 	TAKA 	2716.6 	219.6 	973.4 	58.9 145.7 	531.2 	0.0 53.6 	933.5
+72 	787 	Ron Davis 	USA 	Ozone Zeno2 / Advance Impress 4 	Eagle Paragliding 	2706.3 	746.2 	0.0 18.0 	652.1 	911.0 	368.8 	28.2 50.8
+73 	8888 	Yann Gallin 	FRA 	Ozone Photon / Ozone Gin Race5 	Chicago Paragliding 	2690.1 	673.7 	608.7 	108.2 267.5 	607.5 	0.0 29.3 	692.0
+74 	44 	Forrest Cox 	USA 	Ozone Zeno 2 / Ozone Forza 2 	Northwest Paragliding 	2687.1 	764.9 	678.8 	46.2 114.2 	443.7 	0.0 29.3 	753.5
+75 	327 	Brice Johnson 	USA 	Ozone Photon / Air Design Sock 		2625.8 	781.7 	394.5 	711.2 	0.0 32.9 	94.3 197.7 	644.1
+76 	51 	Stuart Frost 	USA 	Ozone Photon / Skywalk Range 3 		2576.2 	657.6 	583.0 	0.0 262.1 	556.0 	130.4 270.1 	649.2
+77 	500 	Len Szafaryn 	USA 	Ozone Zeno 2 / Advance Impress 4 	Ozone - Flytec USA 	2543.6 	765.9 	727.4 	648.0 	0.0 20.6 	17.6 36.8 	384.7
+78 	128 	Andrew Zoechbauer 	USA 	Ozone Lyght / Woody Valley X-Alps Gto 		2530.1 	243.8 468.0 	601.4 	520.8 	0.0 20.6 	506.3 	657.8
+79 	777 	Chris Amonson 	USA 	Ozone Photon / Gin Genie Lite3 	Northwest Paragliding 	2511.9 	442.3 	166.1 415.8 	628.1 	675.2 	0.0 201.9 	600.2
+80 	2020 	Anna Behrens 	USA 	Ozone Zeno 2 / Advance Impress4 	Calhoun 	2499.4 	778.0 	97.4 174.4 	711.6 	0.0 38.5 	207.1 	705.3
+81 	69 	Syrus Mesdaghi 	USA 	Ozone Photon / Skywalk Xalps Range 3 	Prominent Edge (Geospatial Software Engineering Services) 	2486.1 	749.3 	564.3 	316.0 	0.0 30.9 	105.0 220.1 	751.5
+82 	1288 	Kaviyaan Khalil 	USA 	Niviuk Enzo 3 / Ozone Submarine 		2471.6 	594.4 	547.7 	594.3 	18.5 33.2 	716.7 	0.0
+83 	169 	Vincent Griffith 	USA 	Niviuk Artik R / Niviuk Arrow 	Dusty's Rodeo 	2345.1 	0.0 54.1 	606.0 	133.8 278.3 	616.9 	277.6 	710.8
+84 	188 	Jack Diaz 	USA 	Ozone Enzo 3 / Gin Gr5 	High End Construction 	2306.7 	472.3 	856.6 	39.0 69.4 	0.0 20.6 	541.3 	397.5
+85 	319 	Brian Duffy 	USA 	Ozone Enzo 3 / Gin Race 5 	SICclinic.com 	2236.8 	659.5 	787.9 	30.9 54.9 	0.0 48.2 	61.2 	697.3
+86 	511 	Jun Yomo 	JPN 	Ozone Zeno 2 / Niviuk Drifter2 		2231.2 	635.5 	742.5 	643.2 	17.6 31.5 	192.4 	0.0 23.0
+87 	5097 	Joshua Hockett 	USA 	Ozone Photon / Woody Valley Gto Light 		2218.6 	490.6 	529.4 	94.3 233.3 	620.5 	0.0 31.3 	483.8
+88 	4075 	Lisa Dickinson 	USA 	Ozone Zeno 2 / Gin Gr5 	Bozeman Paragliding 	2215.7 	371.8 	780.9 	401.9 	8.3 20.6 	0.0 	652.8
+89 	5133 	David Gridley 	USA 	Ozone Zeno 2 / Ozone Submarine 	Top Of Lift Paragliding 	2211.5 	449.0 	407.5 	636.4 	0.0 20.6 	95.9 201.0 	622.7
+90 	73 	Alderik Gastmans 	USA 	Ozone Enzo 3 / Gin Gr5 	Astrid 	2207.5 	0.0 	8.6 18.0 	901.6 	20.6 	436.5 	840.2
+91 	129 	Lucien Delacluyse 	USA 	Ozone Photon / Supair Strike 2 	Me 	2206.1 	364.5 	597.3 	628.6 	17.3 43.0 	0.0 29.3 	598.4
+92 	2424 	Eric Bader 	USA 	Ozone Zeno 2 / Advance Impress 4 	Boulder Outdoor Center 	2202.5 	399.0 	574.7 	500.9 	0.0 20.6 	25.3 53.0 	702.6
+93 	1001 	Oleksiy Buynytskyy 	USA 	Ozone Enzo 3 / Kortel Kannibal Race 2 	AirQuest Paragliding 	2143.6 	666.5 	0.0 19.1 	739.0 	678.6 	13.9 29.3 	45.6
+94 	21 	Jason Gore 	USA 	Gin Gto3 / Advance Impress 	Saturn Leadership 	2141.1 	140.6 403.9 	514.8 	455.9 	568.6 	0.0 37.2 	461.2
+95 	1738 	Wyatt Brown 	USA 	Nova Codex / Bogdanfly Corvo 		2124.8 	739.7 	605.4 	138.1 	14.4 35.8 	0.0 29.3 	627.2
+96 	77 	Felix O Figueroa 	USA 	Ozone Zeno 2 / Advance Lightness 4 		2078.4 	526.7 	123.4 220.9 	518.4 	0.0 20.6 	209.0 	700.9
+97 	2100 	David Snowden 	AUS 	Ozone Enzo 3 / Gin G-Race 5 	SkyGypsies / OneSky Pg Intl 	2020.0 	243.0 	659.1 	30.2 53.9 	880.5 	207.2 	0.0 33.0
+98 	33 	Alexey Gagarin 	USA 	Ozone Zeno2 / Woody Valley X-Alps Gto 	AirQuest Paragliding 	1964.9 	644.4 	602.3 	654.0 	23.0 41.1 	41.2 	0.0 22.6
+99 	68 	Yurii Skrypnyk 	UKR 	Ozone Zeolite / Advance Lightness 		1963.5 	466.5 	462.3 	396.4 	0.0 20.6 	96.7 202.7 	541.6
+100 	3223 	Benny Cochran 	USA 	Ozone Zeno / Woodyvalley Gto 	Bozeman Paragliding 	1804.8 	352.7 	469.8 	248.6 	0.0 58.7 	95.6 200.3 	638.1
+101 	1508 	Chloe Fafournoux 	CAN 	Niviuk Peak5 / Ozone Submarine 	Cayoosh Expeditions 	1777.2 	762.0 	544.8 	251.1 	18.4 33.0 	200.9 	0.0 25.1
+102 	1 	andrey yakimov 	USA 	Ozone Zeno 2 / Gr Tbd 	Muppets, AirQuest 	1733.1 	675.7 	0.0 18.9 	253.3 	65.4 	25.7 54.3 	713.0
+103 	930 	Subodh Pandey 	USA 	Ozone Zeno2 / Gin Genie Race 4 		1729.5 	424.2 	364.0 	55.0 97.8 	0.0 20.6 	207.9 	678.4
+104 	313 	JK Smith 	USA 	Gin Gto3 / Gin Gr5 		1713.2 	557.7 	617.2 	538.3 	0.0 	0.0 	0.0
+105 	1232 	Greg Giacovelli 	USA 	Ozone Photon / Woody Valley Gto Light 		1676.0 	0.0 	397.5 	499.0 	9.9 20.6 	29.3 	740.3
+106 	8080 	Marc Collins 	USA 	Ozone Zeno 2 / Supair Delight 2 	Sirensong Wetsuits 	1657.9 	59.3 113.9 	150.9 	634.8 	0.0 20.6 	177.8 	635.1
+107 	666 	Dennis Canty 	USA 	Ozone Zeno 2 / Advance Impress 4 	Canty Law Corp. 	1633.5 	220.7 	516.6 	636.3 	0.0 20.6 	18.3 38.4 	241.6
+108 	567 	Eric Beckman 	USA 	Phi Scala 2 / Gin Genie Race 5 	lumaskyclay 	1599.6 	204.7 	558.6 	36.6 65.1 	0.0 42.0 	201.5 	598.2
+109 	185 	Haruna Goto 	JPN 	Ozone Alpina / Woody Valley Gto 		1506.0 	468.9 	487.2 	119.4 	0.0 29.3 	40.4 84.7 	390.1
+110 	117 	Mike Steed 	USA 	Flow Xc Racer2 / Woody Valley Gto Light 	Flow 	1435.9 	168.1 	368.7 	692.6 	0.0 20.6 	193.9 	12.6 22.6
+111 	343 	Sam Crocker 	USA 	Gin Gto3 / Advance Impress 4 	Sundog Paragliding 	1310.7 	373.6 	364.0 	125.7 	0.0 24.0 	14.0 29.3 	433.4
+112 	888 	Jeff Seals 	USA 	Skywalk Mint / Gin Genie Light 	Uncle Len's Christmas Emporium 	1257.6 	220.5 	666.7 	114.7 	0.0 22.9 	192.1 	63.6 113.7
+113 	123 	Alba Damaris Lillo 	USA 	Ozone Photon / Supair Delight 3 	Aurora💜 	1184.9 	211.7 	19.9 35.6 	476.1 	0.0 20.6 	40.4 	436.8
+114 	451 	Kazuyuki Kitamura 	JPN 	Ozone Zeno 2 / Gin Genie Race 5 		1076.7 	468.1 	558.7 	0.0 	20.6 	29.3 	0.0
+115 	911 	John Cassidy 	USA 	Advance Sigma Dls / Advance Lightness 4 	Me! 	998.9 	248.0 	455.2 	17.8 31.8 	248.6 	29.3 	0.0 30.7
+116 	729 	Carrie Vockrodt 	USA 	Ozone Lyght / Advance Impress 4 	Chrissy Kempf 	748.1 	445.5 	35.0 	218.9 	0.0 20.6 	34.5 	14.2 25.3
+117 	1211 	Nathan Pohl 	USA 	Ozone Delta 5 / Advanced Impress 4 		746.0 	46.9 	485.6 	171.6 	0.0 20.6 	29.3 	12.6 22.6
+118 	207 	Christopher Dunlap 	USA 	Ozone Lyght / Ozone Forza 2 		633.1 	46.9 	364.0 	120.5 	89.6 	0.0 	12.1 30.3
+119 	150 	Greg Kelley 	USA 	Niviuk Icepeak X-One / Gin Genie Race 	Super Fly/ Eagle 	473.8 	473.8 	0.0 	0.0 	0.0 	0.0 	0.0
+120 	171 	Steven Young 	USA 	Ozone Photon / Supair Delight 4 	NCXC 	461.3 	206.7 	26.3 	29.4 	0.0 20.6 	186.3 	12.6 22.6
+121 	67 	Esa Alaraudanjoki 	FIN 	Mac Para Elan 3 / Woody Valley Xalps Gto 2 Light 	Flyeza 	342.6 	176.2 	14.2 25.5 	27.6 	0.0 20.6 	30.4 	94.2
+122 	404 	David Wheeler 	USA 	Ozone Lyght / Niviuk Arrow P 	XCFind.us 	258.0 	181.5 	21.1 	24.5 	8.3 20.6 	0.0 	22.6
+123 	7771 	Andria Lea Monteleone 	USA 	Triple Seven Queen 3 / Supair Delight 4 Sport 	Triple Seven Paragliders, 777 USA, Saint Louis Paragliding, Chicago Paragliding 	103.3 	28.4 	7.2 18.0 	24.5 	20.6 	0.0 	22.6

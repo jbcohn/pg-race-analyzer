@@ -29,7 +29,8 @@ const state = {
     liftSinkWindow: 600,
     liftSinkGridSize: 150,
     liftSinkMinPoints: 3,
-    liftSinkLayerGroup: null
+    liftSinkLayerGroup: null,
+    overallStandings: {}
 };
 
 // Pilot Colors mapping to CSS variables
@@ -349,6 +350,47 @@ function initApp() {
 
     // Restore persisted data from localStorage
     restoreFromStorage();
+
+    // Fetch and parse overall standings
+    fetch(`Tasks/overall_standings.txt?t=${Date.now()}`)
+        .then(res => {
+            if (!res.ok) {
+                throw new Error(`Failed to load overall standings: ${res.statusText}`);
+            }
+            return res.text();
+        })
+        .then(text => {
+            const lines = text.split('\n');
+            state.overallStandings = {};
+            lines.forEach(line => {
+                const trimmed = line.trim();
+                if (!trimmed || trimmed.startsWith('#')) return;
+                
+                let parts = trimmed.split('\t');
+                if (parts.length < 3) {
+                    parts = trimmed.split(/\s{2,}/);
+                }
+                
+                if (parts.length >= 3) {
+                    const rank = parseInt(parts[0].trim(), 10);
+                    const id = parts[1].trim();
+                    const name = parts[2].trim().toLowerCase();
+                    if (!isNaN(rank)) {
+                        state.overallStandings[name] = rank;
+                    }
+                }
+            });
+            console.log('Successfully loaded overall standings for', Object.keys(state.overallStandings).length, 'pilots');
+        })
+        .catch(err => {
+            console.error('Error fetching/parsing overall standings:', err);
+        });
+
+    // Select Top N Pilots event listener
+    const btnApplyTopN = document.getElementById('btn-apply-top-n');
+    if (btnApplyTopN) {
+        btnApplyTopN.addEventListener('click', applyTopNSelection);
+    }
 
     // Initialize Lift/Sink Overlay Controls
     initLiftSinkControls();
@@ -3163,6 +3205,159 @@ function initLiftSinkControls() {
             try { localStorage.setItem('pg-liftsink-minpts', state.liftSinkMinPoints); } catch(err) {}
             updateLiftSinkOverlay();
         });
+    }
+}
+
+function applyTopNSelection() {
+    const inputCount = document.getElementById('input-top-n-count');
+    let n = 10;
+    if (inputCount) {
+        n = parseInt(inputCount.value, 10);
+        if (isNaN(n) || n < 1) n = 10;
+    }
+    
+    // Get mode: "currently", "endOfTask", "overall"
+    let mode = 'currently';
+    const modes = document.getElementsByName('top-n-mode');
+    for (const radio of modes) {
+        if (radio.checked) {
+            mode = radio.value;
+            break;
+        }
+    }
+    
+    if (state.tracks.length === 0) return;
+    
+    if ((mode === 'currently' || mode === 'endOfTask') && (!state.task || state.task.length === 0)) {
+        alert("Please load a task first to select by task metrics.");
+        return;
+    }
+    
+    const sortedTracks = [...state.tracks];
+    
+    // Helper to get distance to goal at current playback time
+    const getDistAtCurrentTime = (track) => {
+        if (!track.tactics || !track.tactics.grToGoalSeries || track.tactics.grToGoalSeries.length === 0) {
+            return Infinity;
+        }
+        const pts = track.points;
+        let idx = track.currentPosIndex || 0;
+        if (idx >= pts.length) idx = pts.length - 1;
+        while (idx < pts.length - 1 && pts[idx + 1].time < state.currentTime) idx++;
+        while (idx > 0 && pts[idx].time > state.currentTime) idx--;
+        
+        if (idx < track.tactics.grToGoalSeries.length) {
+            return track.tactics.grToGoalSeries[idx].distToGoal;
+        }
+        return Infinity;
+    };
+    
+    if (mode === 'currently') {
+        // Ensure all tracks have tactics computed
+        sortedTracks.forEach(track => {
+            if (!track.tactics && state.task && state.task.length > 0) {
+                track.tactics = analyzeTactics(track.points, state.task, state.startGateTime);
+            }
+        });
+        
+        sortedTracks.sort((a, b) => {
+            const aFinished = a.tactics && a.tactics.essCrossTime !== null && a.tactics.essCrossTime !== undefined && state.currentTime >= a.tactics.essCrossTime;
+            const bFinished = b.tactics && b.tactics.essCrossTime !== null && b.tactics.essCrossTime !== undefined && state.currentTime >= b.tactics.essCrossTime;
+            
+            if (aFinished && !bFinished) return -1;
+            if (!aFinished && bFinished) return 1;
+            
+            if (aFinished && bFinished) {
+                const aTime = a.tactics.speedSectionTime ?? Infinity;
+                const bTime = b.tactics.speedSectionTime ?? Infinity;
+                return aTime - bTime;
+            } else {
+                const aDist = getDistAtCurrentTime(a);
+                const bDist = getDistAtCurrentTime(b);
+                return aDist - bDist;
+            }
+        });
+    } else if (mode === 'endOfTask') {
+        // Ensure all tracks have tactics computed
+        sortedTracks.forEach(track => {
+            if (!track.tactics && state.task && state.task.length > 0) {
+                track.tactics = analyzeTactics(track.points, state.task, state.startGateTime);
+            }
+        });
+        
+        sortedTracks.sort((a, b) => {
+            const aFinished = a.tactics && a.tactics.essCrossTime !== null && a.tactics.essCrossTime !== undefined;
+            const bFinished = b.tactics && b.tactics.essCrossTime !== null && b.tactics.essCrossTime !== undefined;
+            
+            if (aFinished && !bFinished) return -1;
+            if (!aFinished && bFinished) return 1;
+            
+            if (aFinished && bFinished) {
+                const aTime = a.tactics.speedSectionTime ?? Infinity;
+                const bTime = b.tactics.speedSectionTime ?? Infinity;
+                return aTime - bTime;
+            } else {
+                const aFinalDist = (a.tactics && a.tactics.grToGoalSeries && a.tactics.grToGoalSeries.length > 0)
+                    ? a.tactics.grToGoalSeries[a.tactics.grToGoalSeries.length - 1].distToGoal
+                    : Infinity;
+                const bFinalDist = (b.tactics && b.tactics.grToGoalSeries && b.tactics.grToGoalSeries.length > 0)
+                    ? b.tactics.grToGoalSeries[b.tactics.grToGoalSeries.length - 1].distToGoal
+                    : Infinity;
+                return aFinalDist - bFinalDist;
+            }
+        });
+    } else if (mode === 'overall') {
+        sortedTracks.sort((a, b) => {
+            const aName = (a.fullName || a.name || '').toLowerCase().trim();
+            const bName = (b.fullName || b.name || '').toLowerCase().trim();
+            const aRank = state.overallStandings[aName] ?? 999;
+            const bRank = state.overallStandings[bName] ?? 999;
+            return aRank - bRank;
+        });
+    }
+    
+    const topNIds = new Set(sortedTracks.slice(0, n).map(t => t.id));
+    
+    state.tracks.forEach(track => {
+        const visible = topNIds.has(track.id);
+        track.visible = visible;
+        
+        if (visible) {
+            if (state.map && track.layerGroup) {
+                track.layerGroup.addTo(state.map);
+            }
+            if (!track.tactics && state.task && state.task.length > 0) {
+                track.tactics = analyzeTactics(track.points, state.task, state.startGateTime);
+                updateMaxSpeedMarker(track);
+                fetchTrackTerrainProfile(track);
+            } else if (track.tactics && !track.terrainProfile) {
+                fetchTrackTerrainProfile(track);
+            }
+        } else {
+            if (state.map && track.layerGroup) {
+                state.map.removeLayer(track.layerGroup);
+            }
+        }
+        
+        const chk = document.querySelector(`.chk-track[data-track-id="${track.id}"]`);
+        if (chk) {
+            chk.checked = visible;
+        }
+    });
+    
+    const chkAll = document.getElementById('chk-all-tracks');
+    if (chkAll) {
+        chkAll.checked = state.tracks.every(t => t.visible !== false);
+    }
+    
+    sortPilotList();
+    if (sideView) sideView.render(state);
+    updateLiftSinkOverlay();
+    
+    // Update stats chart in real-time if panel is open
+    const rightPanelEl = document.getElementById('right-panel');
+    if (rightPanelEl && !rightPanelEl.classList.contains('collapsed')) {
+        updateStatsAnalysis();
     }
 }
 
