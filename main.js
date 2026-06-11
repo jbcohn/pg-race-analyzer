@@ -148,6 +148,10 @@ function initApp() {
     // Lift/Sink layer group
     state.liftSinkLayerGroup = L.featureGroup().addTo(state.map);
 
+    // Setup Map zoom event listeners
+    state.map.on('zoom', updateMarkerSizes);
+    state.map.on('zoomend', updateMarkerSizes);
+
     // Event Listeners
     document.getElementById('file-upload').addEventListener('change', handleFileUpload);
     document.getElementById('btn-clear-tracks').addEventListener('click', clearTracks);
@@ -1244,11 +1248,27 @@ function addTrackToState(rawName, points, terrainProfile = null) {
         initialHeading = rad * 180 / Math.PI;
     }
 
+    // Calculate dynamic pilot marker sizes based on current map zoom
+    let targetSize = 12;
+    let topOffset = 9;
+    let leftOffset = 6;
+    let labelTop = 7;
+    if (state.map) {
+        const zoom = state.map.getZoom();
+        const lat = points[0].lat;
+        const metersPerPixel = (40075016.686 * Math.cos(lat * Math.PI / 180)) / (256 * Math.pow(2, zoom));
+        const size10m = 10 / metersPerPixel;
+        targetSize = Math.max(12, size10m);
+        topOffset = targetSize * 0.75;
+        leftOffset = targetSize * 0.5;
+        labelTop = (targetSize * 0.25) + 4;
+    }
+
     // Dynamic Pilot Marker (Paraglider Wing shape)
     const iconHtml = `
         <div class="pilot-marker-icon" title="${fullName}">
-            <div class="pilot-marker-dot" style="transform: rotate(${initialHeading}deg);">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <div class="pilot-marker-dot" style="transform: rotate(${initialHeading}deg); width: ${targetSize}px; height: ${targetSize}px; top: -${topOffset}px; left: -${leftOffset}px; transform-origin: 50% 75%;">
+                <svg width="${targetSize}" height="${targetSize}" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <!-- Lines connecting wing to pilot -->
                     <line x1="2" y1="12" x2="12" y2="18" stroke="rgba(15, 23, 42, 0.45)" stroke-width="0.75" />
                     <line x1="22" y1="12" x2="12" y2="18" stroke="rgba(15, 23, 42, 0.45)" stroke-width="0.75" />
@@ -1263,14 +1283,14 @@ function addTrackToState(rawName, points, terrainProfile = null) {
                     <path d="M 8 9 Q 12 4.8 16 9" stroke="rgba(255,255,255,0.4)" stroke-width="0.75" />
                 </svg>
             </div>
-            <div class="pilot-marker-label" style="background-color: ${color};">${initials}</div>
+            <div class="pilot-marker-label" style="background-color: ${color}; top: ${labelTop}px;">${initials}</div>
         </div>
     `;
     const icon = L.divIcon({
         html: iconHtml,
         className: '',
-        iconSize: [24, 24],
-        iconAnchor: [12, 12]
+        iconSize: [0, 0],
+        iconAnchor: [0, 0]
     });
     
     const marker = L.marker([points[0].lat, points[0].lng], { icon, title: fullName }).addTo(layerGroup);
@@ -1298,6 +1318,50 @@ function addTrackToState(rawName, points, terrainProfile = null) {
     const tMax = points[points.length - 1].time;
     if (tMin < state.minTime) state.minTime = tMin;
     if (tMax > state.maxTime) state.maxTime = tMax;
+}
+
+function updateMarkerSizes() {
+    if (!state.map || state.tracks.length === 0) return;
+    
+    const zoom = state.map.getZoom();
+    const center = state.map.getCenter();
+    const lat = center.lat;
+    
+    // Formula for meters per pixel in Web Mercator
+    const metersPerPixel = (40075016.686 * Math.cos(lat * Math.PI / 180)) / (256 * Math.pow(2, zoom));
+    
+    // 10 meters in pixels
+    const size10m = 10 / metersPerPixel;
+    
+    // Scale size: minimum 12px, otherwise matching 10m
+    const targetSize = Math.max(12, size10m);
+    const topOffset = targetSize * 0.75;
+    const leftOffset = targetSize * 0.5;
+    const labelTop = (targetSize * 0.25) + 4;
+    
+    state.tracks.forEach(track => {
+        if (!track.marker) return;
+        const markerEl = track.marker.getElement();
+        if (markerEl) {
+            const dot = markerEl.querySelector('.pilot-marker-dot');
+            if (dot) {
+                dot.style.width = `${targetSize}px`;
+                dot.style.height = `${targetSize}px`;
+                dot.style.top = `-${topOffset}px`;
+                dot.style.left = `-${leftOffset}px`;
+                
+                const svg = dot.querySelector('svg');
+                if (svg) {
+                    svg.setAttribute('width', targetSize);
+                    svg.setAttribute('height', targetSize);
+                }
+            }
+            const label = markerEl.querySelector('.pilot-marker-label');
+            if (label) {
+                label.style.top = `${labelTop}px`;
+            }
+        }
+    });
 }
 
 function clearTracks() {
@@ -1378,6 +1442,7 @@ function onAllFilesLoaded() {
     
     updatePilotListUI();
     updatePlaybackState();
+    updateMarkerSizes();
     
     saveTracksToStorage();
 }
