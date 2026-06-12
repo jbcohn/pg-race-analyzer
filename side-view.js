@@ -459,6 +459,47 @@ export class SideView {
             ctx.fillText(tp.id, mapX(centerDist), mapY(elevFt) - 10);
         }
 
+        // --- 3.5 Glide Slope Line ---
+        if (state.drawGlideSlope && state.task && state.task.length > 0) {
+            const ratio = state.glideSlopeRatio || 10;
+            const goalTP = state.task[endGoalIdx];
+            const goalDistKm = optTask ? optTask.distances[endGoalIdx] : totalTaskDist;
+            const goalElevFt = (goalTP.elev || 0) * 3.28084;
+            
+            ctx.save();
+            ctx.strokeStyle = 'rgba(59, 130, 246, 0.75)'; // soft blue
+            ctx.lineWidth = 1.8;
+            ctx.setLineDash([6, 4]);
+            
+            const startX = 0;
+            const startAlt = goalElevFt + (goalDistKm - startX) * 3280.84 / ratio;
+            
+            ctx.beginPath();
+            ctx.moveTo(mapX(startX), mapY(startAlt));
+            ctx.lineTo(mapX(goalDistKm), mapY(goalElevFt));
+            ctx.stroke();
+            
+            // Draw a label text along the slope line
+            ctx.fillStyle = 'rgba(147, 197, 253, 0.9)'; // light blue-300
+            ctx.font = 'bold 10px Inter, Arial, sans-serif';
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'bottom';
+            
+            // Draw label at roughly 25% of the course distance
+            const labelX = goalDistKm * 0.25;
+            const labelAlt = goalElevFt + (goalDistKm - labelX) * 3280.84 / ratio;
+            
+            const pixelDx = (goalDistKm - startX) * this.viewport.scaleX;
+            const pixelDy = (startAlt - goalElevFt) * this.viewport.scaleY;
+            const angle = Math.atan2(-pixelDy, pixelDx);
+            
+            ctx.translate(mapX(labelX), mapY(labelAlt));
+            ctx.rotate(angle);
+            ctx.fillText(`Glide Slope ${ratio}:1`, 10, -4);
+            
+            ctx.restore();
+        }
+
         // --- 2. Pilot Snail Trails ---
         state.tracks.forEach(track => {
             if (track.visible === false || !track.tactics || !track.tactics.grToGoalSeries) return;

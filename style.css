@@ -893,4 +893,198 @@ input[type=range]:disabled::-webkit-slider-thumb { background: var(--text-muted)
     color: var(--text-main) !important;
 }
 
+/* Active Task Title Badge */
+.active-task-title {
+    margin-top: 12px;
+    padding: 8px 12px;
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(99, 102, 241, 0.15) 100%);
+    border: 1px solid rgba(59, 130, 246, 0.3);
+    border-radius: 6px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #93c5fd; /* light blue-300 */
+    text-align: center;
+    box-shadow: var(--shadow);
+    display: none; /* hidden by default, shown when task loaded */
+}
+
+/* Settings Gear Button */
+.btn-settings-toggle {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    transition: all 0.2s ease;
+}
+.btn-settings-toggle:hover {
+    color: var(--text-main);
+    background-color: rgba(255, 255, 255, 0.08);
+    transform: rotate(45deg);
+}
+
+/* Settings Modal Backdrop overlay */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(15, 23, 42, 0.75); /* transparent slate-900 */
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    z-index: 2000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 1;
+    transition: opacity 0.25s ease;
+}
+.modal-overlay.hidden {
+    display: none !important;
+    opacity: 0;
+    pointer-events: none;
+}
+
+/* Modal Content Card */
+.modal-content {
+    background: rgba(30, 41, 59, 0.85); /* slate-800 with alpha */
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    width: 500px;
+    max-width: 90%;
+    max-height: 85vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5), 0 10px 10px -5px rgba(0,0,0,0.5);
+    overflow: hidden;
+    animation: modalScaleIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+@keyframes modalScaleIn {
+    from { transform: scale(0.92); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+}
+
+/* Modal Header */
+.modal-header {
+    padding: 16px 20px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.modal-header h2 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--text-main);
+    margin: 0;
+}
+.btn-close-modal {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    font-size: 1.75rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    transition: all 0.2s;
+    line-height: 1;
+}
+.btn-close-modal:hover {
+    color: var(--text-main);
+    background-color: rgba(255, 255, 255, 0.08);
+}
+
+/* Modal Body */
+.modal-body {
+    padding: 20px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+.modal-body::-webkit-scrollbar {
+    width: 6px;
+}
+.modal-body::-webkit-scrollbar-track {
+    background: transparent;
+}
+.modal-body::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 3px;
+}
+
+/* Modal settings section cards */
+.settings-section {
+    background: rgba(15, 23, 42, 0.4);
+    border: 1px solid rgba(255, 255, 255, 0.04);
+    border-radius: 8px;
+    padding: 16px;
+}
+.settings-section h3 {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 12px;
+    margin-top: 0;
+}
+
+/* Custom Map Type Switcher Leaflet Control */
+.custom-map-type-toggle {
+    margin-bottom: 12px !important;
+    margin-right: 12px !important;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+    border-radius: 8px;
+    border: 2px solid #ffffff;
+    overflow: hidden;
+    width: 74px;
+    height: 74px;
+    position: relative;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.custom-map-type-toggle:hover {
+    transform: scale(1.08);
+    box-shadow: 0 6px 16px rgba(0,0,0,0.5);
+    border-color: var(--accent);
+}
+.map-type-thumbnail-wrapper {
+    width: 100%;
+    height: 100%;
+    position: relative;
+}
+#map-type-thumbnail {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+.map-type-label {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    background: rgba(15, 23, 42, 0.75);
+    backdrop-filter: blur(2px);
+    color: #ffffff;
+    font-size: 9px;
+    font-weight: bold;
+    text-align: center;
+    padding: 3px 0;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+    letter-spacing: 0.03em;
+}
+
+
 

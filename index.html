@@ -13,7 +13,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     
     <!-- Custom CSS -->
-    <link rel="stylesheet" href="style.css?v=3.0">
+    <link rel="stylesheet" href="style.css?v=4.0">
 </head>
 <body>
 
@@ -21,8 +21,17 @@
         <!-- Sidebar for Controls and Pilot Stats -->
         <aside class="sidebar">
             <div class="sidebar-header">
-                <h1>Race Analyzer</h1>
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <h1>Race Analyzer</h1>
+                    <button id="btn-open-settings" class="btn-settings-toggle" title="Settings">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                            <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/>
+                            <path fill-rule="evenodd" d="M19.438 12a7.48 7.48 0 0 0-.05-.823l1.864-1.46c.168-.13.217-.365.111-.55l-1.764-3.056c-.105-.185-.331-.258-.523-.186l-2.197.885c-.456-.35-.96-.642-1.505-.863l-.332-2.34a.439.439 0 0 0-.435-.373H9.414a.439.439 0 0 0-.435.373l-.332 2.34c-.545.22-1.049.513-1.505.863l-2.197-.885a.442.442 0 0 0-.523.186L2.658 9.167c-.106.185-.057.42.111.55l1.864 1.46c-.035.27-.05.544-.05.823s.015.553.05.823l-1.864 1.46c-.168.13-.217.365-.111.55l1.764 3.056c.105.185.331.258.523.186l2.197-.885c.456.35.96.642 1.505.863l.332 2.34c.045.318.318.557.64.557h3.528c.322 0 .595-.239.64-.557l.332-2.34c.545-.22 1.049-.513 1.505-.863l2.197.885a.442.442 0 0 0 .523-.186l1.764-3.056c.106-.185.057-.42-.111-.55l-1.864-1.46c.035-.27.05-.544.05-.823Zm-1.5-.028a.5.5 0 0 1 .238.419c.005.105.008.209.008.312a5.975 5.975 0 0 1-.413 2.188.5.5 0 0 1-.453.308l-2.09-.088a.5.5 0 0 1-.41-.283 4.469 4.469 0 0 0-1.127-1.127.5.5 0 0 1-.283-.41l-.088-2.09a.5.5 0 0 1 .308-.453 5.975 5.975 0 0 1 2.188-.413c.103 0 .207.003.312.008a.5.5 0 0 1 .419.238l1.096 1.792Zm-11.876 0a.5.5 0 0 0-.238.419c-.005.105-.008.209-.008.312a5.975 5.975 0 0 0 .413 2.188.5.5 0 0 0 .453.308l2.09-.088c.18-.008.342.103.41.283a4.469 4.469 0 0 0 1.127 1.127.5.5 0 0 0 .283.41l.088 2.09a.5.5 0 0 0 .308.453 5.975 5.975 0 0 0 2.188.413c.103 0 .207-.003.312-.008a.5.5 0 0 0 .419-.238l1.096-1.792a.5.5 0 0 0-.238-.419c-.105-.005-.209-.008-.312-.008a5.975 5.975 0 0 0-2.188.413.5.5 0 0 0-.453.308l-.088 2.09a.5.5 0 0 0-.283.41 4.469 4.469 0 0 1-1.127-1.127.5.5 0 0 0-.41-.283l-2.09-.088a.5.5 0 0 0-.453-.308 5.975 5.975 0 0 0-.413-2.188c0-.103.003-.207.008-.312a.5.5 0 0 0-.238-.419l-1.792-1.096Z" clip-rule="evenodd"/>
+                        </svg>
+                    </button>
+                </div>
                 <p>Upload IGC files to compare pilots.</p>
+                <div id="active-task-title" class="active-task-title">No Task Active</div>
             </div>
             
             <div class="control-group upload-section">
@@ -44,78 +53,7 @@
                 </div>
             </div>
 
-            <div class="control-group task-section">
-                <h3>Task Definition</h3>
-                <div class="task-presets-row" id="task-presets-container" style="margin-bottom: 8px; display: none;">
-                    <label for="task-select" style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 4px; display: block;">Select Predefined Task:</label>
-                    <select id="task-select" style="width: 100%; background: var(--bg-card); color: var(--text-main); border: 1px solid var(--border); border-radius: 4px; padding: 6px; font-size: 0.8rem; margin-bottom: 8px;">
-                        <option value="">-- Select Task --</option>
-                    </select>
-                </div>
-                <label class="btn-secondary" for="wpt-upload" style="margin-bottom: 8px;">
-                    Upload Waypoints (.wpt/.cup)
-                    <input type="file" id="wpt-upload" accept=".wpt,.cup" style="display: none;">
-                </label>
-                
-                <textarea id="task-textarea" placeholder="Paste task table here..." rows="4" style="width: 100%; background: var(--bg-card); color: var(--text-main); border: 1px solid var(--border); border-radius: 4px; padding: 8px; margin-bottom: 8px; font-family: monospace; font-size: 0.75rem; resize: vertical;">id 		Radius 	Dist. 	Description
-LAUNCH 	launch 	400 m   		LAUNCH
-LAUNCH 	SS 	10.0 Km 	10.00 Km 	LAUNCH
-BADGRN 		3.0 Km 	26.17 Km 	BADGRN
-US2WTH 		7.0 Km 	58.69 Km 	US2WTH
-ORNDLZ 		12.0 Km 	86.81 Km 	ORNDLZ
-SOCCER 	ES 	8.0 Km 	93.03 Km 	SOCCER
-SOCCER 	goal 	100 m   	101.00 Km 	SOCCER
-Startgate: 	13:30:00
-Deadline: 	19:00:00</textarea>
 
-                <div class="task-controls">
-                    <button id="btn-draw-task" class="btn-secondary">Draw Task</button>
-                    <button id="btn-clear-task" class="btn-secondary danger">Clear</button>
-                </div>
-                <div id="task-gate-info" class="task-gate-info" style="margin-top: 8px; font-size: 0.8rem; color: var(--text-muted); display: flex; flex-direction: column; gap: 4px;"></div>
-            </div>
-
-            <div class="control-group liftsink-section">
-                <h3>Lift/Sink Map</h3>
-                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
-                    <label for="chk-liftsink-enable" style="font-size: 0.825rem; color: var(--text-main); cursor: pointer; display: flex; align-items: center; gap: 8px; user-select: none;">
-                        <input type="checkbox" id="chk-liftsink-enable" style="width: 16px; height: 16px; margin: 0; cursor: pointer;">
-                        Enable Overlay
-                    </label>
-                </div>
-                <div id="liftsink-controls-wrapper" style="display: none; flex-direction: column; gap: 10px; margin-top: 10px; border-top: 1px solid var(--border); padding-top: 10px;">
-                    <div>
-                        <label for="select-liftsink-mode" style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-bottom: 4px;">Display Mode</label>
-                        <select id="select-liftsink-mode" style="width: 100%; padding: 6px; border-radius: 4px; background: var(--bg-card); color: var(--text-main); border: 1px solid var(--border); font-size: 0.8rem;">
-                            <option value="raw" selected>Raw Trails</option>
-                            <option value="average">Grid Averages</option>
-                        </select>
-                    </div>
-                    <div>
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">
-                            <label for="slide-liftsink-window" style="font-size: 0.75rem; color: var(--text-muted);">Time Window</label>
-                            <span id="label-liftsink-window" style="font-size: 0.75rem; font-family: monospace; color: var(--text-main);">10 min</span>
-                        </div>
-                        <input type="range" id="slide-liftsink-window" min="1" max="30" value="10" step="1" style="width: 100%; height: 4px; border-radius: 2px; background: var(--border); cursor: pointer; accent-color: var(--primary);">
-                    </div>
-                    <div id="average-settings-wrapper" style="display: none; flex-direction: column; gap: 10px;">
-                        <div>
-                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">
-                                <label for="slide-liftsink-gridsize" style="font-size: 0.75rem; color: var(--text-muted);">Grid Size</label>
-                                <span id="label-liftsink-gridsize" style="font-size: 0.75rem; font-family: monospace; color: var(--text-main);">150m</span>
-                            </div>
-                            <input type="range" id="slide-liftsink-gridsize" min="50" max="500" value="150" step="25" style="width: 100%; height: 4px; border-radius: 2px; background: var(--border); cursor: pointer; accent-color: var(--primary);">
-                        </div>
-                        <div>
-                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">
-                                <label for="slide-liftsink-minpts" style="font-size: 0.75rem; color: var(--text-muted);">Min Trackpoints</label>
-                                <span id="label-liftsink-minpts" style="font-size: 0.75rem; font-family: monospace; color: var(--text-main);">3</span>
-                            </div>
-                            <input type="range" id="slide-liftsink-minpts" min="1" max="10" value="3" step="1" style="width: 100%; height: 4px; border-radius: 2px; background: var(--border); cursor: pointer; accent-color: var(--primary);">
-                        </div>
-                    </div>
-                </div>
-            </div>
 
             <div class="pilot-stats-container">
                 <div class="pilot-list-header" style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
@@ -296,6 +234,114 @@ Deadline: 	19:00:00</textarea>
         </aside>
     </div>
 
+    <!-- Settings Modal -->
+    <div id="settings-modal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Settings</h2>
+                <button id="btn-close-settings" class="btn-close-modal" title="Close Settings">×</button>
+            </div>
+            
+            <div class="modal-body">
+                <!-- Task Definition -->
+                <div class="settings-section">
+                    <h3>Task Definition</h3>
+                    <div class="task-presets-row" id="task-presets-container" style="margin-bottom: 8px; display: none;">
+                        <label for="task-select" style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 4px; display: block;">Select Predefined Task:</label>
+                        <select id="task-select" style="width: 100%; background: var(--bg-card); color: var(--text-main); border: 1px solid var(--border); border-radius: 4px; padding: 6px; font-size: 0.8rem; margin-bottom: 8px;">
+                            <option value="">-- Select Task --</option>
+                        </select>
+                    </div>
+                    
+                    <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+                        <label class="btn-secondary" for="wpt-upload" style="margin-bottom: 0; flex: 1; text-align: center; cursor: pointer;">
+                            Upload Waypoints (.wpt/.cup)
+                            <input type="file" id="wpt-upload" accept=".wpt,.cup" style="display: none;">
+                        </label>
+                    </div>
+                    
+                    <textarea id="task-textarea" placeholder="Paste task table here..." rows="5" style="width: 100%; background: var(--bg-card); color: var(--text-main); border: 1px solid var(--border); border-radius: 4px; padding: 8px; margin-bottom: 8px; font-family: monospace; font-size: 0.75rem; resize: vertical;">id 		Radius 	Dist. 	Description
+LAUNCH 	launch 	400 m   		LAUNCH
+LAUNCH 	SS 	10.0 Km 	10.00 Km 	LAUNCH
+BADGRN 		3.0 Km 	26.17 Km 	BADGRN
+US2WTH 		7.0 Km 	58.69 Km 	US2WTH
+ORNDLZ 		12.0 Km 	86.81 Km 	ORNDLZ
+SOCCER 	ES 	8.0 Km 	93.03 Km 	SOCCER
+SOCCER 	goal 	100 m   	101.00 Km 	SOCCER
+Startgate: 	13:30:00
+Deadline: 	19:00:00</textarea>
+
+                    <div class="task-controls" style="display: flex; gap: 8px;">
+                        <button id="btn-draw-task" class="btn-secondary" style="flex: 1;">Draw Task</button>
+                        <button id="btn-clear-task" class="btn-secondary danger" style="flex: 1;">Clear</button>
+                    </div>
+                    <div id="task-gate-info" class="task-gate-info" style="margin-top: 8px; font-size: 0.8rem; color: var(--text-muted); display: flex; flex-direction: column; gap: 4px;"></div>
+                </div>
+                
+                <!-- Lift/Sink Map Overlay -->
+                <div class="settings-section">
+                    <h3>Lift/Sink Map</h3>
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                        <label for="chk-liftsink-enable" style="font-size: 0.825rem; color: var(--text-main); cursor: pointer; display: flex; align-items: center; gap: 8px; user-select: none;">
+                            <input type="checkbox" id="chk-liftsink-enable" style="width: 16px; height: 16px; margin: 0; cursor: pointer;">
+                            Enable Overlay
+                        </label>
+                    </div>
+                    <div id="liftsink-controls-wrapper" style="display: none; flex-direction: column; gap: 10px; margin-top: 10px; border-top: 1px solid var(--border); padding-top: 10px;">
+                        <div>
+                            <label for="select-liftsink-mode" style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-bottom: 4px;">Display Mode</label>
+                            <select id="select-liftsink-mode" style="width: 100%; padding: 6px; border-radius: 4px; background: var(--bg-card); color: var(--text-main); border: 1px solid var(--border); font-size: 0.8rem;">
+                                <option value="raw" selected>Raw Trails</option>
+                                <option value="average">Grid Averages</option>
+                            </select>
+                        </div>
+                        <div>
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">
+                                <label for="slide-liftsink-window" style="font-size: 0.75rem; color: var(--text-muted);">Time Window</label>
+                                <span id="label-liftsink-window" style="font-size: 0.75rem; font-family: monospace; color: var(--text-main);">10 min</span>
+                            </div>
+                            <input type="range" id="slide-liftsink-window" min="1" max="30" value="10" step="1" style="width: 100%; height: 4px; border-radius: 2px; background: var(--border); cursor: pointer; accent-color: var(--primary);">
+                        </div>
+                        <div id="average-settings-wrapper" style="display: none; flex-direction: column; gap: 10px;">
+                            <div>
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">
+                                    <label for="slide-liftsink-gridsize" style="font-size: 0.75rem; color: var(--text-muted);">Grid Size</label>
+                                    <span id="label-liftsink-gridsize" style="font-size: 0.75rem; font-family: monospace; color: var(--text-main);">150m</span>
+                                </div>
+                                <input type="range" id="slide-liftsink-gridsize" min="50" max="500" value="150" step="25" style="width: 100%; height: 4px; border-radius: 2px; background: var(--border); cursor: pointer; accent-color: var(--primary);">
+                            </div>
+                            <div>
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">
+                                    <label for="slide-liftsink-minpts" style="font-size: 0.75rem; color: var(--text-muted);">Min Trackpoints</label>
+                                    <span id="label-liftsink-minpts" style="font-size: 0.75rem; font-family: monospace; color: var(--text-main);">3</span>
+                                </div>
+                                <input type="range" id="slide-liftsink-minpts" min="1" max="10" value="3" step="1" style="width: 100%; height: 4px; border-radius: 2px; background: var(--border); cursor: pointer; accent-color: var(--primary);">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Glide Slope Indicator -->
+                <div class="settings-section">
+                    <h3>Glide Slope (Side View)</h3>
+                    <label for="chk-draw-glide-slope" style="font-size: 0.825rem; color: var(--text-main); cursor: pointer; display: flex; align-items: center; gap: 8px; user-select: none; margin-bottom: 10px;">
+                        <input type="checkbox" id="chk-draw-glide-slope" style="width: 16px; height: 16px; margin: 0; cursor: pointer;">
+                        Draw Glide Slope from Goal Line
+                    </label>
+                    <div id="glide-slope-controls-wrapper" style="display: none; flex-direction: column; gap: 10px; border-top: 1px solid var(--border); padding-top: 10px;">
+                        <div>
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">
+                                <label for="slide-glide-slope-ratio" style="font-size: 0.75rem; color: var(--text-muted);">Glide Ratio (R:1)</label>
+                                <span id="label-glide-slope-ratio" style="font-size: 0.75rem; font-family: monospace; color: var(--text-main);">10:1</span>
+                            </div>
+                            <input type="range" id="slide-glide-slope-ratio" min="1" max="15" value="10" step="1" style="width: 100%; height: 4px; border-radius: 2px; background: var(--border); cursor: pointer; accent-color: var(--primary);">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Leaflet JS -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
     
@@ -311,6 +357,6 @@ Deadline: 	19:00:00</textarea>
     <script type="module" src="shared/waypoint-parsers.js"></script>
     <script type="module" src="shared/tactics.js"></script>
     <script type="module" src="side-view.js"></script>
-    <script type="module" src="main.js?v=3.0"></script>
+    <script type="module" src="main.js?v=4.0"></script>
 </body>
 </html>

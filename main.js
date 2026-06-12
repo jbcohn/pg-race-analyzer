@@ -30,7 +30,13 @@ const state = {
     liftSinkGridSize: 150,
     liftSinkMinPoints: 3,
     liftSinkLayerGroup: null,
-    overallStandings: {}
+    overallStandings: {},
+    drawGlideSlope: false,
+    glideSlopeRatio: 10,
+    activeTaskName: "No Task Active",
+    topoMap: null,
+    satelliteMap: null,
+    currentMapType: 'topo'
 };
 
 // Pilot Colors mapping to CSS variables
@@ -134,6 +140,26 @@ function getLocalElevation(lat, lng) {
     return (1 - tx) * (1 - ty) * e00 + tx * (1 - ty) * e01 + (1 - tx) * ty * e10 + tx * ty * e11;
 }
 
+function toggleMapType() {
+    if (state.currentMapType === 'topo') {
+        state.map.removeLayer(state.topoMap);
+        state.satelliteMap.addTo(state.map);
+        state.currentMapType = 'satellite';
+        const img = document.getElementById('map-type-thumbnail');
+        const label = document.querySelector('.map-type-label');
+        if (img) img.src = 'shared/topo_thumbnail.png';
+        if (label) label.textContent = 'Topo Map';
+    } else {
+        state.map.removeLayer(state.satelliteMap);
+        state.topoMap.addTo(state.map);
+        state.currentMapType = 'topo';
+        const img = document.getElementById('map-type-thumbnail');
+        const label = document.querySelector('.map-type-label');
+        if (img) img.src = 'shared/satellite_thumbnail.png';
+        if (label) label.textContent = 'Satellite';
+    }
+}
+
 function initApp() {
     // Load local DEM grid data
     loadLocalDem();
@@ -142,25 +168,41 @@ function initApp() {
     state.map = L.map('map').setView([46.8, 8.2], 8); // Default to Switzerland
     
     // Define base map tile layers
-    const topoMap = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+    state.topoMap = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
         maxZoom: 17,
         attribution: 'Map data: &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, SRTM | Map style: &copy; <a href="https://opentopomap.org">OpenTopoMap</a> (CC-BY-SA)'
     });
     
-    const satelliteMap = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+    state.satelliteMap = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
         maxZoom: 19,
         attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
     });
 
     // Add default topo map to the map
-    topoMap.addTo(state.map);
+    state.topoMap.addTo(state.map);
+    state.currentMapType = 'topo';
 
-    // Layer control for switching maps
-    const baseMaps = {
-        "Topo Map": topoMap,
-        "Satellite Map": satelliteMap
-    };
-    L.control.layers(baseMaps).addTo(state.map);
+    // Add custom thumbnail map switcher control in the bottom right
+    const CustomMapTypeControl = L.Control.extend({
+        options: { position: 'bottomright' },
+        onAdd: function (map) {
+            const container = L.DomUtil.create('div', 'custom-map-type-toggle');
+            container.innerHTML = `
+                <div class="map-type-thumbnail-wrapper">
+                    <img id="map-type-thumbnail" src="shared/satellite_thumbnail.png" alt="Satellite View">
+                    <div class="map-type-label">Satellite</div>
+                </div>
+            `;
+            
+            // Prevent event propagation so clicking control doesn't drag/click the map
+            L.DomEvent.disableClickPropagation(container);
+            L.DomEvent.disableScrollPropagation(container);
+            
+            container.addEventListener('click', toggleMapType);
+            return container;
+        }
+    });
+    state.map.addControl(new CustomMapTypeControl());
 
     // Add map scale control
     L.control.scale({ position: 'bottomleft' }).addTo(state.map);
@@ -212,6 +254,7 @@ function initApp() {
     
     // UI Resizer & Toggle
     setupSidebarControls();
+    initSettingsMenu();
     
     // Sort and persistent sorting option
     document.getElementById('pilot-sort-select').addEventListener('change', (e) => {
@@ -424,6 +467,13 @@ function setupPredefinedTasks() {
                 
                 const taskInfo = manifest.tasks.find(t => t.id === val);
                 if (!taskInfo) return;
+                
+                state.activeTaskName = taskInfo.name;
+                const taskTitleEl = document.getElementById('active-task-title');
+                if (taskTitleEl) {
+                    taskTitleEl.textContent = taskInfo.name;
+                    taskTitleEl.style.display = 'block';
+                }
                 
                 const loaderEl = document.getElementById('track-loader');
                 const loaderTextEl = document.getElementById('track-loader-text');
@@ -649,6 +699,62 @@ function setupSidebarControls() {
     });
 }
 
+function initSettingsMenu() {
+    const modal = document.getElementById('settings-modal');
+    const openBtn = document.getElementById('btn-open-settings');
+    const closeBtn = document.querySelector('.btn-close-modal');
+    
+    if (openBtn && modal) {
+        openBtn.addEventListener('click', () => {
+            modal.classList.remove('hidden');
+        });
+    }
+    
+    if (closeBtn && modal) {
+        closeBtn.addEventListener('click', () => {
+            modal.classList.add('hidden');
+        });
+    }
+    
+    if (modal) {
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                modal.classList.add('hidden');
+            }
+        });
+    }
+
+    // Glide Slope Controls wiring
+    const drawGlideSlopeCheckbox = document.getElementById('chk-draw-glide-slope');
+    const glideSlopeRatioSlider = document.getElementById('slide-glide-slope-ratio');
+    const glideSlopeControlsWrapper = document.getElementById('glide-slope-controls-wrapper');
+    const labelGlideSlopeRatio = document.getElementById('label-glide-slope-ratio');
+
+    if (drawGlideSlopeCheckbox) {
+        drawGlideSlopeCheckbox.addEventListener('change', (e) => {
+            state.drawGlideSlope = e.target.checked;
+            if (glideSlopeControlsWrapper) {
+                glideSlopeControlsWrapper.style.display = e.target.checked ? 'flex' : 'none';
+            }
+            if (sideView && state.task && state.task.length > 0) {
+                sideView.render(state);
+            }
+        });
+    }
+
+    if (glideSlopeRatioSlider) {
+        glideSlopeRatioSlider.addEventListener('input', (e) => {
+            state.glideSlopeRatio = parseFloat(e.target.value);
+            if (labelGlideSlopeRatio) {
+                labelGlideSlopeRatio.textContent = `${state.glideSlopeRatio}:1`;
+            }
+            if (sideView && state.task && state.task.length > 0) {
+                sideView.render(state);
+            }
+        });
+    }
+}
+
 function handleWptUpload(e) {
     resetPredefinedTaskSelect();
     const file = e.target.files[0];
@@ -684,13 +790,39 @@ function handleWptUpload(e) {
 function drawTask() {
     const text = document.getElementById('task-textarea').value;
     if (!text) return;
+
+    const lines = text.split(/\r?\n/);
+    
+    let taskName = state.activeTaskName;
+    if (!taskName || taskName === "No Task Active") {
+        taskName = "Custom Task";
+        for (let i = 0; i < Math.min(5, lines.length); i++) {
+            const line = lines[i].trim();
+            if (line.toLowerCase().startsWith('task') || line.toLowerCase().includes('race')) {
+                taskName = line;
+                break;
+            }
+        }
+        state.activeTaskName = taskName;
+    }
+    const taskTitleEl = document.getElementById('active-task-title');
+    if (taskTitleEl) {
+        taskTitleEl.textContent = taskName;
+        taskTitleEl.style.display = 'block';
+    }
     
     // Clear existing
     clearTask();
+    // Keep active task name since clearTask resets it
+    state.activeTaskName = taskName;
+    if (taskTitleEl) {
+        taskTitleEl.textContent = taskName;
+        taskTitleEl.style.display = 'block';
+    }
+    
     state.taskLayerGroup = L.featureGroup().addTo(state.map);
     state.task = [];
 
-    const lines = text.split(/\r?\n/);
     let previousTaskPoint = null;
 
     for (let line of lines) {
@@ -832,6 +964,13 @@ function drawTask() {
 }
 
 function clearTask() {
+    state.activeTaskName = "No Task Active";
+    const taskTitleEl = document.getElementById('active-task-title');
+    if (taskTitleEl) {
+        taskTitleEl.textContent = 'No Task Active';
+        taskTitleEl.style.display = 'none';
+    }
+    
     if (state.taskLayerGroup) {
         state.map.removeLayer(state.taskLayerGroup);
         state.taskLayerGroup = null;
