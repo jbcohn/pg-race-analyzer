@@ -572,6 +572,15 @@ input[type=range]:disabled::-webkit-slider-thumb { background: var(--text-muted)
     display: flex;
     align-items: center;
     gap: 8px;
+    height: 18px; /* Fixed height to prevent vertical shifting */
+    overflow: hidden;
+}
+#track-loader-text {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex: 1;
+    min-width: 0;
 }
 .loader-spinner {
     width: 14px;
