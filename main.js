@@ -488,6 +488,10 @@ function setupPredefinedTasks() {
                     taskTitleEl.style.display = 'block';
                 }
                 
+                // Close settings modal immediately so user can see progress
+                const modal = document.getElementById('settings-modal');
+                if (modal) modal.classList.add('hidden');
+                
                 const loaderEl = document.getElementById('track-loader');
                 const loaderTextEl = document.getElementById('track-loader-text');
                 const loaderBarEl = document.getElementById('loader-bar-fill');
@@ -599,6 +603,10 @@ function setupPredefinedTasks() {
                     }
                     
                     await Promise.all(workers);
+                    
+                    if (loaderBarEl) loaderBarEl.style.width = '100%';
+                    if (loaderTextEl) loaderTextEl.textContent = 'All preset tracks loaded!';
+                    await new Promise(resolve => setTimeout(resolve, 300));
                     
                     // Trigger UI updates
                     onAllFilesLoaded();
@@ -1393,22 +1401,50 @@ async function fetchTrackTerrainProfileDirect(track) {
     }
 }
 
-function handleFileUpload(e) {
+async function handleFileUpload(e) {
     resetPredefinedTaskSelect();
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
-    let processedCount = 0;
+    // Close settings modal immediately so progress bar is visible floating on the page
+    const modal = document.getElementById('settings-modal');
+    if (modal) modal.classList.add('hidden');
+
+    const loader = document.getElementById('track-loader');
+    const fill = document.getElementById('loader-bar-fill');
+    const text = document.getElementById('track-loader-text');
+
+    if (loader) {
+        loader.classList.remove('hidden');
+        if (text) text.textContent = `Preparing to load ${files.length} files...`;
+        if (fill) fill.style.width = '0%';
+    }
+
+    // Yield thread to let modal close and loader render
+    await new Promise(resolve => setTimeout(resolve, 100));
+
+    let successfulCount = 0;
 
     for (let i = 0; i < files.length; i++) {
         const file = files[i];
-        const reader = new FileReader();
+        const name = file.name;
+        const cleanName = formatPilotName(name);
 
-        reader.onload = (event) => {
-            const content = event.target.result;
-            const name = file.name;
+        if (text) text.textContent = `Reading ${cleanName}... (${i + 1}/${files.length})`;
+        if (fill) fill.style.width = `${(i / files.length) * 100}%`;
+
+        // Yield thread to let UI update
+        await new Promise(resolve => setTimeout(resolve, 20));
+
+        try {
+            const content = await new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = (event) => resolve(event.target.result);
+                reader.onerror = (err) => reject(err);
+                reader.readAsText(file);
+            });
+
             let rawPoints = [];
-
             if (name.toLowerCase().endsWith('.igc')) {
                 rawPoints = parseIGC(content);
             } else if (name.toLowerCase().endsWith('.gpx')) {
@@ -1417,20 +1453,25 @@ function handleFileUpload(e) {
                 rawPoints = parseKML(content);
             }
 
-            if (rawPoints.length > 0) {
-                // Ensure monotonic timestamps
+            if (rawPoints && rawPoints.length > 0) {
                 const points = ensureTimestamps(rawPoints);
-                addTrackToState(file.name, points);
+                addTrackToState(name, points);
+                successfulCount++;
             }
-
-            processedCount++;
-            if (processedCount === files.length) {
-                onAllFilesLoaded();
-            }
-        };
-        reader.readAsText(file);
+        } catch (err) {
+            console.error(`Error loading file ${name}:`, err);
+        }
     }
-    
+
+    if (fill) fill.style.width = '100%';
+    if (text) text.textContent = `Successfully loaded ${successfulCount} tracks!`;
+
+    // Wait a brief moment for the user to see the success state
+    await new Promise(resolve => setTimeout(resolve, 300));
+
+    if (loader) loader.classList.add('hidden');
+    onAllFilesLoaded();
+
     // Reset file input
     e.target.value = '';
 }
