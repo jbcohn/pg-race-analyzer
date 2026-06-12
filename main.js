@@ -1309,50 +1309,50 @@ function addTrackToState(rawName, points, terrainProfile = null) {
         initialHeading = rad * 180 / Math.PI;
     }
 
-    // Calculate dynamic pilot marker sizes based on current map zoom (minimum size is 18px now, 150% of 12px)
-    let targetSize = 18;
-    let topOffset = 7.13;
-    let leftOffset = 9;
-    let labelTop = 11.13;
+    // Calculate dynamic pilot marker sizes based on current map zoom (minimum size is 36px now, 150% of 24px)
+    let targetSize = 36;
+    let topOffset = 18;
+    let leftOffset = 18;
+    let labelTop = 22;
     if (state.map) {
         const zoom = state.map.getZoom();
         const lat = points[0].lat;
         const metersPerPixel = (40075016.686 * Math.cos(lat * Math.PI / 180)) / (256 * Math.pow(2, zoom));
         const size10m = 10 / metersPerPixel;
-        targetSize = Math.max(18, size10m);
-        topOffset = targetSize * 0.396;
+        targetSize = Math.max(36, size10m * 1.2);
+        topOffset = targetSize * 0.5;
         leftOffset = targetSize * 0.5;
-        labelTop = (targetSize * 0.396) + 4;
+        labelTop = (targetSize * 0.5) + 4;
     }
 
     // Dynamic Pilot Marker (Paraglider Wing shape - Symmetrical Top-Down View)
     const iconHtml = `
         <div class="pilot-marker-icon" title="${fullName}">
-            <div class="pilot-marker-dot" style="transform: rotate(${initialHeading}deg); width: ${targetSize}px; height: ${targetSize}px; top: -${topOffset}px; left: -${leftOffset}px; transform-origin: 50% 39.6%;">
-                <svg width="${targetSize}" height="${targetSize}" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <div class="pilot-marker-dot" style="transform: rotate(${initialHeading}deg); width: ${targetSize}px; height: ${targetSize}px; top: -${topOffset}px; left: -${leftOffset}px; transform-origin: 50% 50%;">
+                <svg width="${targetSize}" height="${targetSize}" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <!-- Lines connecting wing to pilot harness -->
-                    <line x1="2" y1="12" x2="12" y2="9.5" stroke="rgba(15, 23, 42, 0.35)" stroke-width="0.5" />
-                    <line x1="7" y1="8.3" x2="12" y2="9.5" stroke="rgba(15, 23, 42, 0.35)" stroke-width="0.5" />
-                    <line x1="9.5" y1="7.3" x2="12" y2="9.5" stroke="rgba(15, 23, 42, 0.35)" stroke-width="0.5" />
-                    <line x1="12" y1="7" x2="12" y2="9.5" stroke="rgba(15, 23, 42, 0.35)" stroke-width="0.5" />
-                    <line x1="14.5" y1="7.3" x2="12" y2="9.5" stroke="rgba(15, 23, 42, 0.35)" stroke-width="0.5" />
-                    <line x1="17" y1="8.3" x2="12" y2="9.5" stroke="rgba(15, 23, 42, 0.35)" stroke-width="0.5" />
-                    <line x1="22" y1="12" x2="12" y2="9.5" stroke="rgba(15, 23, 42, 0.35)" stroke-width="0.5" />
+                    <line x1="4" y1="24" x2="24" y2="24" stroke="rgba(15, 23, 42, 0.35)" stroke-width="0.5" />
+                    <line x1="14" y1="16.6" x2="24" y2="24" stroke="rgba(15, 23, 42, 0.35)" stroke-width="0.5" />
+                    <line x1="19" y1="14.6" x2="24" y2="24" stroke="rgba(15, 23, 42, 0.35)" stroke-width="0.5" />
+                    <line x1="24" y1="14" x2="24" y2="24" stroke="rgba(15, 23, 42, 0.35)" stroke-width="0.5" />
+                    <line x1="29" y1="14.6" x2="24" y2="24" stroke="rgba(15, 23, 42, 0.35)" stroke-width="0.5" />
+                    <line x1="34" y1="16.6" x2="24" y2="24" stroke="rgba(15, 23, 42, 0.35)" stroke-width="0.5" />
+                    <line x1="44" y1="24" x2="24" y2="24" stroke="rgba(15, 23, 42, 0.35)" stroke-width="0.5" />
                     
-                    <!-- Pod Harness (Pilot) - sticking out front and back, tail sticks out farther than foot from CG at 9.5 -->
-                    <path d="M 12 2 C 13.5 2, 13.8 6.5, 13.8 9.5 C 13.8 13.5, 13.3 19, 12 19 C 10.7 19, 10.2 13.5, 10.2 9.5 C 10.2 6.5, 10.5 2, 12 2 Z" fill="#0f172a" stroke="white" stroke-width="0.75" />
+                    <!-- Pod Harness (Pilot) - sticking out front and back, tail sticks out farther than foot from CG at 24 -->
+                    <path d="M 24 16.5 C 25.5 16.5, 25.8 21, 25.8 24 C 25.8 28, 25.3 33.5, 24 33.5 C 22.7 33.5, 22.2 28, 22.2 24 C 22.2 21, 22.5 16.5, 24 16.5 Z" fill="#0f172a" stroke="white" stroke-width="0.75" />
 
                     <!-- Paraglider Wing Canopy - drawn on top of harness so it comes out front and back -->
-                    <path d="M 2 12 Q 12 4 22 12 Q 12 7 2 12 Z" fill="${color}" stroke="#0f172a" stroke-width="1.25" stroke-linejoin="round" />
+                    <path d="M 4 24 Q 24 8 44 24 Q 24 14 4 24 Z" fill="${color}" stroke="#0f172a" stroke-width="1.25" stroke-linejoin="round" />
 
                     <!-- Internal cell details (ribs) for realistic top view -->
-                    <line x1="12" y1="4" x2="12" y2="7" stroke="rgba(255,255,255,0.4)" stroke-width="0.55" />
-                    <line x1="9.5" y1="4.5" x2="9.5" y2="7.3" stroke="rgba(255,255,255,0.4)" stroke-width="0.55" />
-                    <line x1="7" y1="6" x2="7" y2="8.3" stroke="rgba(255,255,255,0.4)" stroke-width="0.55" />
-                    <line x1="4.5" y1="8.5" x2="4.5" y2="9.8" stroke="rgba(255,255,255,0.4)" stroke-width="0.55" />
-                    <line x1="14.5" y1="4.5" x2="14.5" y2="7.3" stroke="rgba(255,255,255,0.4)" stroke-width="0.55" />
-                    <line x1="17" y1="6" x2="17" y2="8.3" stroke="rgba(255,255,255,0.4)" stroke-width="0.55" />
-                    <line x1="19.5" y1="8.5" x2="19.5" y2="9.8" stroke="rgba(255,255,255,0.4)" stroke-width="0.55" />
+                    <line x1="24" y1="16" x2="24" y2="19" stroke="rgba(255,255,255,0.4)" stroke-width="0.55" />
+                    <line x1="19" y1="16.5" x2="19" y2="19.3" stroke="rgba(255,255,255,0.4)" stroke-width="0.55" />
+                    <line x1="14" y1="18" x2="14" y2="20.25" stroke="rgba(255,255,255,0.4)" stroke-width="0.55" />
+                    <line x1="9" y1="20.5" x2="9" y2="21.8" stroke="rgba(255,255,255,0.4)" stroke-width="0.55" />
+                    <line x1="29" y1="16.5" x2="29" y2="19.3" stroke="rgba(255,255,255,0.4)" stroke-width="0.55" />
+                    <line x1="34" y1="18" x2="34" y2="20.25" stroke="rgba(255,255,255,0.4)" stroke-width="0.55" />
+                    <line x1="39" y1="20.5" x2="39" y2="21.8" stroke="rgba(255,255,255,0.4)" stroke-width="0.55" />
                 </svg>
             </div>
             <div class="pilot-marker-label" style="background-color: ${color}; top: ${labelTop}px;">${initials}</div>
@@ -1405,11 +1405,11 @@ function updateMarkerSizes() {
     // 10 meters in pixels
     const size10m = 10 / metersPerPixel;
     
-    // Scale size: minimum 18px, otherwise matching 10m
-    const targetSize = Math.max(18, size10m);
-    const topOffset = targetSize * 0.396;
+    // Scale size: minimum 36px, otherwise matching 10m (with 1.2 multiplier so wing span is 10m on map)
+    const targetSize = Math.max(36, size10m * 1.2);
+    const topOffset = targetSize * 0.5;
     const leftOffset = targetSize * 0.5;
-    const labelTop = (targetSize * 0.396) + 4;
+    const labelTop = (targetSize * 0.5) + 4;
     
     state.tracks.forEach(track => {
         if (!track.marker) return;
