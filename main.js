@@ -1331,28 +1331,28 @@ function addTrackToState(rawName, points, terrainProfile = null) {
             <div class="pilot-marker-dot" style="transform: rotate(${initialHeading}deg); width: ${targetSize}px; height: ${targetSize}px; top: -${topOffset}px; left: -${leftOffset}px; transform-origin: 50% 50%;">
                 <svg width="${targetSize}" height="${targetSize}" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <!-- Lines connecting wing to pilot harness -->
-                    <line x1="4" y1="24" x2="24" y2="24" stroke="rgba(15, 23, 42, 0.35)" stroke-width="0.5" />
-                    <line x1="14" y1="21" x2="24" y2="24" stroke="rgba(15, 23, 42, 0.35)" stroke-width="0.5" />
-                    <line x1="19" y1="20.25" x2="24" y2="24" stroke="rgba(15, 23, 42, 0.35)" stroke-width="0.5" />
+                    <line x1="5" y1="25" x2="24" y2="24" stroke="rgba(15, 23, 42, 0.35)" stroke-width="0.5" />
+                    <line x1="14" y1="21.3" x2="24" y2="24" stroke="rgba(15, 23, 42, 0.35)" stroke-width="0.5" />
+                    <line x1="19" y1="20.3" x2="24" y2="24" stroke="rgba(15, 23, 42, 0.35)" stroke-width="0.5" />
                     <line x1="24" y1="20" x2="24" y2="24" stroke="rgba(15, 23, 42, 0.35)" stroke-width="0.5" />
-                    <line x1="29" y1="20.25" x2="24" y2="24" stroke="rgba(15, 23, 42, 0.35)" stroke-width="0.5" />
-                    <line x1="34" y1="21" x2="24" y2="24" stroke="rgba(15, 23, 42, 0.35)" stroke-width="0.5" />
-                    <line x1="44" y1="24" x2="24" y2="24" stroke="rgba(15, 23, 42, 0.35)" stroke-width="0.5" />
+                    <line x1="29" y1="20.3" x2="24" y2="24" stroke="rgba(15, 23, 42, 0.35)" stroke-width="0.5" />
+                    <line x1="34" y1="21.3" x2="24" y2="24" stroke="rgba(15, 23, 42, 0.35)" stroke-width="0.5" />
+                    <line x1="43" y1="25" x2="24" y2="24" stroke="rgba(15, 23, 42, 0.35)" stroke-width="0.5" />
                     
                     <!-- Pod Harness (Pilot) - sticking out front and back, nose at 16.5, tail at 33, CG at 24 -->
                     <path d="M 24 16.5 C 25.5 16.5, 25.8 21, 25.8 24 C 25.8 28, 25.3 33.0, 24 33.0 C 22.7 33.0, 22.2 28, 22.2 24 C 22.2 21, 22.5 16.5, 24 16.5 Z" fill="#0f172a" stroke="white" stroke-width="0.75" />
 
-                    <!-- Paraglider Wing Canopy - drawn on top of harness so it comes out front and back (width/chord increased to 6 units) -->
-                    <path d="M 4 24 Q 24 16 44 24 Q 24 28 4 24 Z" fill="${color}" stroke="#0f172a" stroke-width="1.25" stroke-linejoin="round" />
+                    <!-- Paraglider Wing Canopy - rounded, swept back wing tips (chord of 3 at tips) -->
+                    <path d="M 5 25 Q 24 15 43 25 C 44.5 25, 44.5 28, 43 28 Q 24 24 5 28 C 3.5 28, 3.5 25, 5 25 Z" fill="${color}" stroke="#0f172a" stroke-width="1.25" stroke-linejoin="round" />
 
                     <!-- Internal cell details (ribs) for realistic top view -->
                     <line x1="24" y1="20" x2="24" y2="26" stroke="rgba(255,255,255,0.4)" stroke-width="0.55" />
-                    <line x1="19" y1="20.25" x2="19" y2="25.875" stroke="rgba(255,255,255,0.4)" stroke-width="0.55" />
-                    <line x1="14" y1="21" x2="14" y2="25.5" stroke="rgba(255,255,255,0.4)" stroke-width="0.55" />
-                    <line x1="9" y1="22.25" x2="9" y2="24.875" stroke="rgba(255,255,255,0.4)" stroke-width="0.55" />
-                    <line x1="29" y1="20.25" x2="29" y2="25.875" stroke="rgba(255,255,255,0.4)" stroke-width="0.55" />
-                    <line x1="34" y1="21" x2="34" y2="25.5" stroke="rgba(255,255,255,0.4)" stroke-width="0.55" />
-                    <line x1="39" y1="22.25" x2="39" y2="24.875" stroke="rgba(255,255,255,0.4)" stroke-width="0.55" />
+                    <line x1="19" y1="20.3" x2="19" y2="26.1" stroke="rgba(255,255,255,0.4)" stroke-width="0.55" />
+                    <line x1="14" y1="21.3" x2="14" y2="26.5" stroke="rgba(255,255,255,0.4)" stroke-width="0.55" />
+                    <line x1="9" y1="23.2" x2="9" y2="27.3" stroke="rgba(255,255,255,0.4)" stroke-width="0.55" />
+                    <line x1="29" y1="20.3" x2="29" y2="26.1" stroke="rgba(255,255,255,0.4)" stroke-width="0.55" />
+                    <line x1="34" y1="21.3" x2="34" y2="26.5" stroke="rgba(255,255,255,0.4)" stroke-width="0.55" />
+                    <line x1="39" y1="23.2" x2="39" y2="27.3" stroke="rgba(255,255,255,0.4)" stroke-width="0.55" />
                 </svg>
             </div>
             <div class="pilot-marker-label" style="background-color: ${color}; top: ${labelTop}px;">${initials}</div>
