@@ -84,7 +84,9 @@ export class SideView {
         window.addEventListener('mousemove', (e) => {
             if (!this.isDragging) return;
             const dx = e.clientX - this.lastMouse.x;
+            const dy = e.clientY - this.lastMouse.y;
             this.viewport.offsetX += dx;
+            this.viewport.offsetY += dy;
             this.lastMouse = { x: e.clientX, y: e.clientY };
             if (this.lastState) this.render(this.lastState);
         });
@@ -131,11 +133,19 @@ export class SideView {
             
             const rect = this.canvas.getBoundingClientRect();
             const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
             
-            const distX = mouseX - this.viewport.offsetX;
-            
-            this.viewport.scaleX *= zoomFactor;
-            this.viewport.offsetX = mouseX - distX * zoomFactor;
+            if (e.shiftKey) {
+                // Zoom vertical (Alt)
+                const distY = mouseY - this.viewport.offsetY;
+                this.viewport.scaleY *= zoomFactor;
+                this.viewport.offsetY = mouseY - distY * zoomFactor;
+            } else {
+                // Zoom horizontal (Dist)
+                const distX = mouseX - this.viewport.offsetX;
+                this.viewport.scaleX *= zoomFactor;
+                this.viewport.offsetX = mouseX - distX * zoomFactor;
+            }
             
             if (this.lastState) this.render(this.lastState);
         }, { passive: false });
@@ -682,6 +692,30 @@ export class SideView {
         if (this.lastState) {
             this.render(this.lastState);
         }
+    }
+
+    zoomHorizontal(factor) {
+        if (!this.canvas) return;
+        const W = this.canvas.width;
+        const centerX = W / 2;
+        const distX = centerX - this.viewport.offsetX;
+        
+        this.viewport.scaleX *= factor;
+        this.viewport.offsetX = centerX - distX * factor;
+        
+        if (this.lastState) this.render(this.lastState);
+    }
+
+    zoomVertical(factor) {
+        if (!this.canvas) return;
+        const H = this.canvas.height;
+        const centerY = H / 2;
+        const distY = centerY - this.viewport.offsetY;
+        
+        this.viewport.scaleY *= factor;
+        this.viewport.offsetY = centerY - distY * factor;
+        
+        if (this.lastState) this.render(this.lastState);
     }
 
     // Choose a nice round step for grid lines

@@ -247,6 +247,19 @@ function initApp() {
         if (sideView) sideView.resetZoom();
     });
 
+    document.getElementById('btn-zoom-h-in').addEventListener('click', () => {
+        if (sideView) sideView.zoomHorizontal(1.25);
+    });
+    document.getElementById('btn-zoom-h-out').addEventListener('click', () => {
+        if (sideView) sideView.zoomHorizontal(1 / 1.25);
+    });
+    document.getElementById('btn-zoom-v-in').addEventListener('click', () => {
+        if (sideView) sideView.zoomVertical(1.25);
+    });
+    document.getElementById('btn-zoom-v-out').addEventListener('click', () => {
+        if (sideView) sideView.zoomVertical(1 / 1.25);
+    });
+
     document.getElementById('timeline-scrubber').addEventListener('input', handleScrub);
     document.getElementById('playback-speed').addEventListener('change', (e) => {
         state.playbackSpeed = parseInt(e.target.value, 10);

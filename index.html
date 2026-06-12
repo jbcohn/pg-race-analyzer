@@ -33,25 +33,7 @@
                 <p>Upload IGC files to compare pilots.</p>
                 <div id="active-task-title" class="active-task-title">No Task Active</div>
             </div>
-            
-            <div class="control-group upload-section">
-                <div class="upload-controls" style="display: flex; gap: 8px;">
-                    <label class="btn-primary" for="file-upload" style="flex: 1; text-align: center; margin-bottom: 0; display: flex; align-items: center; justify-content: center; cursor: pointer;">
-                        Upload Tracks (.igc)
-                        <input type="file" id="file-upload" accept=".igc,.gpx,.kml" multiple style="display: none;">
-                    </label>
-                    <button id="btn-clear-tracks" class="btn-secondary danger" style="flex: 1;">Clear</button>
-                </div>
-                <div id="track-loader" class="track-loader hidden">
-                    <div class="track-loader-info">
-                        <div class="loader-spinner"></div>
-                        <span id="track-loader-text">Loading cached tracks...</span>
-                    </div>
-                    <div class="loader-bar-bg">
-                        <div id="loader-bar-fill" class="loader-bar-fill"></div>
-                    </div>
-                </div>
-            </div>
+
 
 
 
@@ -137,7 +119,19 @@
                 
                 <div id="side-view-container">
                     <canvas id="side-view-canvas"></canvas>
-                    <button id="btn-reset-side-view" class="btn-side-overlay" title="Reset Scale / Fit Course">⟲ Fit Course</button>
+                    <div class="side-view-tools">
+                        <button id="btn-reset-side-view" class="btn-side-overlay" title="Reset Scale / Fit Course">⟲ Fit Course</button>
+                        <div class="side-view-zoom-group">
+                            <span class="zoom-label">↔ Dist:</span>
+                            <button id="btn-zoom-h-in" class="btn-side-overlay zoom-btn" title="Horizontal Zoom In">+</button>
+                            <button id="btn-zoom-h-out" class="btn-side-overlay zoom-btn" title="Horizontal Zoom Out">-</button>
+                        </div>
+                        <div class="side-view-zoom-group">
+                            <span class="zoom-label">↕ Alt:</span>
+                            <button id="btn-zoom-v-in" class="btn-side-overlay zoom-btn" title="Vertical Zoom In">+</button>
+                            <button id="btn-zoom-v-out" class="btn-side-overlay zoom-btn" title="Vertical Zoom Out">-</button>
+                        </div>
+                    </div>
                 </div>
             </div>
             
@@ -243,6 +237,27 @@
             </div>
             
             <div class="modal-body">
+                <!-- Track Management -->
+                <div class="settings-section">
+                    <h3>Track Management</h3>
+                    <div class="upload-controls" style="display: flex; gap: 8px;">
+                        <label class="btn-primary" for="file-upload" style="flex: 1; text-align: center; margin-bottom: 0; display: flex; align-items: center; justify-content: center; cursor: pointer;">
+                            Upload Tracks (.igc)
+                            <input type="file" id="file-upload" accept=".igc,.gpx,.kml" multiple style="display: none;">
+                        </label>
+                        <button id="btn-clear-tracks" class="btn-secondary danger" style="flex: 1;">Clear Tracks</button>
+                    </div>
+                    <div id="track-loader" class="track-loader hidden" style="margin-top: 10px;">
+                        <div class="track-loader-info">
+                            <div class="loader-spinner"></div>
+                            <span id="track-loader-text">Loading cached tracks...</span>
+                        </div>
+                        <div class="loader-bar-bg">
+                            <div id="loader-bar-fill" class="loader-bar-fill"></div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Task Definition -->
                 <div class="settings-section">
                     <h3>Task Definition</h3>

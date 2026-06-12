@@ -895,17 +895,16 @@ input[type=range]:disabled::-webkit-slider-thumb { background: var(--text-muted)
 
 /* Active Task Title Badge */
 .active-task-title {
-    margin-top: 12px;
-    padding: 8px 12px;
-    background: linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(99, 102, 241, 0.15) 100%);
-    border: 1px solid rgba(59, 130, 246, 0.3);
-    border-radius: 6px;
-    font-size: 0.85rem;
-    font-weight: 600;
-    color: #93c5fd; /* light blue-300 */
-    text-align: center;
-    box-shadow: var(--shadow);
+    margin-top: 14px;
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: var(--accent); /* blue accent color */
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    text-align: left;
     display: none; /* hidden by default, shown when task loaded */
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    padding-bottom: 8px;
 }
 
 /* Settings Gear Button */
@@ -1084,6 +1083,58 @@ input[type=range]:disabled::-webkit-slider-thumb { background: var(--text-muted)
     padding: 3px 0;
     text-shadow: 0 1px 2px rgba(0,0,0,0.8);
     letter-spacing: 0.03em;
+}
+
+/* Side View Toolbars overlay */
+.side-view-tools {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    z-index: 10;
+    pointer-events: auto;
+}
+.side-view-zoom-group {
+    display: flex;
+    align-items: center;
+    background: rgba(30, 41, 59, 0.75);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 2px 6px;
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    gap: 4px;
+}
+.zoom-label {
+    font-size: 0.7rem;
+    font-weight: bold;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    user-select: none;
+    margin-right: 2px;
+}
+.zoom-btn {
+    position: static !important; /* Override position absolute on .btn-side-overlay */
+    padding: 2px 8px !important;
+    font-size: 0.8rem !important;
+    font-weight: 700 !important;
+    margin: 0 !important;
+    min-width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.08) !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    border-radius: 3px !important;
+    line-height: 1;
+}
+.zoom-btn:hover {
+    background: var(--accent) !important;
+    border-color: var(--accent) !important;
+    color: #ffffff !important;
 }
 
 
