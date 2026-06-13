@@ -1107,6 +1107,13 @@ input[type=range]:disabled::-webkit-slider-thumb { background: var(--text-muted)
     z-index: 10;
     pointer-events: auto;
 }
+/* Reset button inside toolbar should flow inline, not be absolutely positioned */
+.side-view-tools .btn-side-overlay {
+    position: static;
+    padding: 4px 10px;
+    font-size: 0.75rem;
+}
+
 .side-view-zoom-group {
     display: flex;
     align-items: center;

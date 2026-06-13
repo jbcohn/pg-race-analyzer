@@ -4,6 +4,15 @@ import { parseWaypointFile } from './shared/waypoint-parsers.js';
 import { analyzeTactics, calculateRemainingLegs, getOptimizedTaskDistances } from './shared/tactics.js';
 import { SideView } from './side-view.js';
 
+/**
+ * Encode a relative file path for use in fetch() URLs.
+ * Encodes each path segment individually so spaces and special characters
+ * like parentheses are percent-encoded, while slashes are preserved.
+ */
+function encodePath(path) {
+    return path.split('/').map(segment => encodeURIComponent(segment)).join('/');
+}
+
 // Application State
 const state = {
     map: null,
@@ -105,7 +114,7 @@ let sideView;
 
 async function loadLocalDem() {
     try {
-        const response = await fetch(`Tasks/chelan-dem.json?t=${Date.now()}`);
+        const response = await fetch(`${encodePath('Tasks/chelan-dem.json')}?t=${Date.now()}`);
         if (!response.ok) throw new Error(`HTTP error ${response.status}`);
         state.localDem = await response.json();
         console.log("Successfully loaded local DEM grid:", state.localDem.rows, "x", state.localDem.cols);
@@ -408,7 +417,7 @@ function initApp() {
     restoreFromStorage();
 
     // Fetch and parse overall standings
-    fetch(`Tasks/overall_standings.txt?t=${Date.now()}`)
+    fetch(`${encodePath('Tasks/overall_standings.txt')}?t=${Date.now()}`)
         .then(res => {
             if (!res.ok) {
                 throw new Error(`Failed to load overall standings: ${res.statusText}`);
@@ -453,7 +462,7 @@ function initApp() {
 }
 
 function setupPredefinedTasks() {
-    fetch(`Tasks/manifest.json?t=${Date.now()}`)
+    fetch(`${encodePath('Tasks/manifest.json')}?t=${Date.now()}`)
         .then(res => {
             if (!res.ok) throw new Error('No predefined tasks found');
             return res.json();
@@ -508,7 +517,7 @@ function setupPredefinedTasks() {
                     // 1. Load waypoints
                     if (manifest.waypoint_file) {
                         if (loaderTextEl) loaderTextEl.textContent = 'Loading waypoints...';
-                        const wptRes = await fetch(`${manifest.waypoint_file}?t=${Date.now()}`);
+                        const wptRes = await fetch(`${encodePath(manifest.waypoint_file)}?t=${Date.now()}`);
                         const wptText = await wptRes.text();
                         const newWpts = parseWaypointFile(wptText, "us-open-paragliding-2025.FS(1).wpt");
                         Object.assign(state.waypoints, newWpts);
@@ -518,7 +527,7 @@ function setupPredefinedTasks() {
                     // 2. Load task definition
                     if (taskInfo.task_file) {
                         if (loaderTextEl) loaderTextEl.textContent = 'Loading task definition...';
-                        const taskRes = await fetch(`${taskInfo.task_file}?t=${Date.now()}`);
+                        const taskRes = await fetch(`${encodePath(taskInfo.task_file)}?t=${Date.now()}`);
                         const taskText = await taskRes.text();
                         document.getElementById('task-textarea').value = taskText;
                         try { localStorage.setItem('pg-task-text', taskText); } catch(err) {}
@@ -568,7 +577,7 @@ function setupPredefinedTasks() {
                         const cleanName = formatPilotName(filename);
                         if (loaderTextEl) loaderTextEl.textContent = `Fetching ${cleanName}...`;
                         
-                        const trackRes = await fetch(`${url}?t=${Date.now()}`);
+                        const trackRes = await fetch(`${encodePath(url)}?t=${Date.now()}`);
                         const text = await trackRes.text();
                         const trackPoints = parseIGC(text);
                         if (!trackPoints || trackPoints.length === 0) return;
