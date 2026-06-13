@@ -108,6 +108,70 @@ export function parseWaypointFile(text, filename) {
     return waypoints;
 }
 
+/**
+ * Parse task definitions with embedded waypoint coordinates.
+ * Looks for table rows with columns like: No, Leg Dist, Id, Radius, Open, Close, Coordinates, Altitude
+ * Extracts Lat: XX.XXXXX Lon: -YYY.YYYYY patterns
+ * Returns object mapping waypoint IDs to {lat, lng, elev}
+ */
+export function parseTaskCoordinates(text) {
+    const waypoints = {};
+    const lines = text.split(/\r?\n/);
+
+    for (let i = 0; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (!line) continue;
+        
+        // Recreate the regex each iteration to avoid stale lastIndex from the g flag
+        const coordPattern = /Lat:\s*([-\d.]+)\s+Lon:\s*([-\d.]+)/i;
+        const coordMatch = coordPattern.exec(line);
+        if (coordMatch) {
+            const lat = parseFloat(coordMatch[1]);
+            const lng = parseFloat(coordMatch[2]);
+            
+            if (!isNaN(lat) && !isNaN(lng)) {
+                // Extract the waypoint ID from the portion of the line before the coordinates
+                let lineBefore = line.substring(0, coordMatch.index);
+                
+                // Split by tabs or multiple spaces
+                const parts = lineBefore.split(/\t+|\s{2,}/);
+                let id = null;
+                
+                // Find a non-numeric identifier. In the tabular format:
+                //   "No \t Leg Dist \t Id \t Radius \t ... \t Coordinates"
+                // the ID is at index 2.
+                if (parts.length >= 3) {
+                    const candidate = parts[2].replace(/[^\w-]/g, '').trim();
+                    if (candidate && !candidate.match(/^\d+(\.\d+)?$/)) {
+                        id = candidate;
+                    }
+                }
+                
+                // Fallback: look for any uppercase identifier in lineBefore
+                if (!id) {
+                    const matches = lineBefore.match(/[A-Z]{2,}[A-Z0-9]*/);
+                    if (matches) {
+                        id = matches[0];
+                    }
+                }
+                
+                // Extract elevation (look for number followed by 'm' immediately before "Lat:")
+                let elev = 0;
+                const elevMatch = line.match(/(\d+)\s*m\s+Lat:/);
+                if (elevMatch) {
+                    elev = parseInt(elevMatch[1], 10);
+                }
+                
+                if (id) {
+                    waypoints[id] = { lat, lng, elev, name: id };
+                }
+            }
+        }
+    }
+    
+    return waypoints;
+}
+
 // SeeYou coordinates are DDMM.mmmN/S or DDDMM.mmmE/W
 function parseCupCoord(str, isLat) {
     if (!str || str.length < 8) return NaN;

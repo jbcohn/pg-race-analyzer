@@ -330,31 +330,37 @@ export class SideView {
 
         // --- 2. Ground Profile ---
         const panelBgColor = this.resolveColor('var(--bg-panel)');
+
         if (terrainProfile && terrainProfile.length > 0) {
-            // A. Solid mask using background color to cover cylinders below ground
+            const lastTerrain = terrainProfile[terrainProfile.length - 1];
+            const lastElevFt = lastTerrain.elevFt;
+
+            // A. Solid background mask — clips cylinders drawn below ground
             ctx.fillStyle = panelBgColor;
             ctx.beginPath();
             ctx.moveTo(mapX(terrainProfile[0].distKm), this.canvas.height);
             for (const pt of terrainProfile) {
                 ctx.lineTo(mapX(pt.distKm), mapY(pt.elevFt));
             }
-            ctx.lineTo(mapX(terrainProfile[terrainProfile.length - 1].distKm), this.canvas.height);
+            ctx.lineTo(mapX(maxScaleDist), mapY(lastElevFt));
+            ctx.lineTo(mapX(maxScaleDist), this.canvas.height);
             ctx.closePath();
             ctx.fill();
 
-            // B. Detailed DEM terrain fill
-            ctx.fillStyle = 'rgba(133, 77, 14, 0.18)';
+            // B. Terrain fill
+            ctx.fillStyle = 'rgba(133, 77, 14, 0.22)';
             ctx.beginPath();
             ctx.moveTo(mapX(terrainProfile[0].distKm), this.canvas.height);
             for (const pt of terrainProfile) {
                 ctx.lineTo(mapX(pt.distKm), mapY(pt.elevFt));
             }
-            ctx.lineTo(mapX(terrainProfile[terrainProfile.length - 1].distKm), this.canvas.height);
+            ctx.lineTo(mapX(maxScaleDist), mapY(lastElevFt));
+            ctx.lineTo(mapX(maxScaleDist), this.canvas.height);
             ctx.closePath();
             ctx.fill();
 
-            // C. Terrain top edge stroke
-            ctx.strokeStyle = '#854d0e';
+            // C. Terrain top-edge stroke
+            ctx.strokeStyle = 'rgba(180, 100, 20, 0.9)';
             ctx.lineWidth = 1.5;
             ctx.beginPath();
             for (let i = 0; i < terrainProfile.length; i++) {
@@ -362,8 +368,10 @@ export class SideView {
                 if (i === 0) ctx.moveTo(mapX(pt.distKm), mapY(pt.elevFt));
                 else ctx.lineTo(mapX(pt.distKm), mapY(pt.elevFt));
             }
+            ctx.lineTo(mapX(maxScaleDist), mapY(lastElevFt));
             ctx.stroke();
         } else {
+
             // Fallback solid mask
             // Fallback solid mask
             ctx.fillStyle = panelBgColor;
@@ -427,29 +435,9 @@ export class SideView {
             ctx.stroke();
         }
 
-        // Draw individual pilot terrain profiles if available
-        state.tracks.forEach(track => {
-            if (track.visible === false || !track.terrainProfile || track.terrainProfile.length === 0) return;
-            
-            const resolvedColor = this.resolveColor(track.color);
-            ctx.save();
-            ctx.strokeStyle = resolvedColor;
-            ctx.lineWidth = 1.0;
-            ctx.globalAlpha = 0.55; // slightly transparent to not clutter
-            ctx.beginPath();
-            
-            for (let i = 0; i < track.terrainProfile.length; i++) {
-                const pt = track.terrainProfile[i];
-                const x = mapX(pt.distKm);
-                const y = mapY(pt.elevFt);
-                if (i === 0) ctx.moveTo(x, y);
-                else ctx.lineTo(x, y);
-            }
-            ctx.stroke();
-            ctx.restore();
-        });
 
         // --- 3. Turnpoint labels ---
+
         for (let i = 0; i <= endGoalIdx; i++) {
             const tp = state.task[i];
             const distFlown = optTask ? optTask.distances[i] : (totalTaskDist - calculateRemainingLegs(state.task, i, endGoalIdx));
@@ -473,42 +461,51 @@ export class SideView {
         if (state.drawGlideSlope && state.task && state.task.length > 0) {
             const ratio = state.glideSlopeRatio || 10;
             const goalTP = state.task[endGoalIdx];
-            const goalDistKm = optTask ? optTask.distances[endGoalIdx] : totalTaskDist;
-            const goalElevFt = (goalTP.elev || 0) * 3.28084;
-            
+
+            // Goal ground elevation: use the waypoint's own elev field when available
+            // (most waypoint files include it). Fall back to the terrain profile's
+            // last sample only when the waypoint has no elevation data (elev === 0).
+            let goalElevFt = (goalTP.elev || 0) * 3.28084;
+            if (goalElevFt === 0 && terrainProfile && terrainProfile.length > 0) {
+                goalElevFt = terrainProfile[terrainProfile.length - 1].elevFt;
+            }
+
+            const lineEndDist = maxScaleDist;
+            const lineEndAlt  = goalElevFt; // goal elevation at the cylinder edge
+
+            const startX   = 0;
+            const startAlt = lineEndAlt + lineEndDist * 3280.84 / ratio;
+
             ctx.save();
             ctx.strokeStyle = 'rgba(59, 130, 246, 0.75)'; // soft blue
             ctx.lineWidth = 1.8;
             ctx.setLineDash([6, 4]);
-            
-            const startX = 0;
-            const startAlt = goalElevFt + (goalDistKm - startX) * 3280.84 / ratio;
-            
+
             ctx.beginPath();
             ctx.moveTo(mapX(startX), mapY(startAlt));
-            ctx.lineTo(mapX(goalDistKm), mapY(goalElevFt));
+            ctx.lineTo(mapX(lineEndDist), mapY(lineEndAlt));
             ctx.stroke();
-            
-            // Draw a label text along the slope line
-            ctx.fillStyle = 'rgba(147, 197, 253, 0.9)'; // light blue-300
+
+            // Label at ~25% along the course
+            ctx.fillStyle = 'rgba(147, 197, 253, 0.9)';
             ctx.font = 'bold 10px Inter, Arial, sans-serif';
             ctx.textAlign = 'left';
             ctx.textBaseline = 'bottom';
-            
-            // Draw label at roughly 25% of the course distance
-            const labelX = goalDistKm * 0.25;
-            const labelAlt = goalElevFt + (goalDistKm - labelX) * 3280.84 / ratio;
-            
-            const pixelDx = (goalDistKm - startX) * this.viewport.scaleX;
-            const pixelDy = (startAlt - goalElevFt) * this.viewport.scaleY;
+
+            const labelX   = lineEndDist * 0.25;
+            const labelAlt = lineEndAlt + (lineEndDist - labelX) * 3280.84 / ratio;
+
+            const pixelDx = lineEndDist * this.viewport.scaleX;
+            const pixelDy = (startAlt - lineEndAlt) * this.viewport.scaleY;
             const angle = Math.atan2(-pixelDy, pixelDx);
-            
+
             ctx.translate(mapX(labelX), mapY(labelAlt));
             ctx.rotate(angle);
             ctx.fillText(`Glide Slope ${ratio}:1`, 10, -4);
-            
+
             ctx.restore();
         }
+
 
         // --- 2. Pilot Snail Trails ---
         state.tracks.forEach(track => {

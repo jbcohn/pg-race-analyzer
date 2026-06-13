@@ -1,6 +1,6 @@
 import { parseIGC, parseGPX, parseKML, ensureTimestamps } from './shared/parsers.js';
 import { haversineDistance, bearing } from './shared/geo-math.js';
-import { parseWaypointFile } from './shared/waypoint-parsers.js';
+import { parseWaypointFile, parseTaskCoordinates } from './shared/waypoint-parsers.js';
 import { analyzeTactics, calculateRemainingLegs, getOptimizedTaskDistances } from './shared/tactics.js';
 import { SideView } from './side-view.js';
 
@@ -737,6 +737,14 @@ function initSettingsMenu() {
     if (openBtn && modal) {
         openBtn.addEventListener('click', () => {
             modal.classList.remove('hidden');
+            // Sync glide slope wrapper to actual checkbox state on every open
+            // (browser form-state autocomplete may have changed the checkbox after init)
+            const chk = document.getElementById('chk-draw-glide-slope');
+            const wrapper = document.getElementById('glide-slope-controls-wrapper');
+            if (chk && wrapper) {
+                state.drawGlideSlope = chk.checked;
+                wrapper.style.display = chk.checked ? 'flex' : 'none';
+            }
         });
     }
     
@@ -761,8 +769,25 @@ function initSettingsMenu() {
     const labelGlideSlopeRatio = document.getElementById('label-glide-slope-ratio');
 
     if (drawGlideSlopeCheckbox) {
+        // Restore persisted state
+        try {
+            const stored = localStorage.getItem('pg-draw-glide-slope');
+            if (stored !== null) state.drawGlideSlope = stored === 'true';
+            const storedRatio = localStorage.getItem('pg-glide-slope-ratio');
+            if (storedRatio !== null) state.glideSlopeRatio = parseFloat(storedRatio);
+        } catch(e) {}
+
+        // Sync DOM to restored state
+        drawGlideSlopeCheckbox.checked = state.drawGlideSlope;
+        if (glideSlopeControlsWrapper) {
+            glideSlopeControlsWrapper.style.display = state.drawGlideSlope ? 'flex' : 'none';
+        }
+        if (glideSlopeRatioSlider) glideSlopeRatioSlider.value = state.glideSlopeRatio;
+        if (labelGlideSlopeRatio) labelGlideSlopeRatio.textContent = `${state.glideSlopeRatio}:1`;
+
         drawGlideSlopeCheckbox.addEventListener('change', (e) => {
             state.drawGlideSlope = e.target.checked;
+            try { localStorage.setItem('pg-draw-glide-slope', state.drawGlideSlope); } catch(err) {}
             if (glideSlopeControlsWrapper) {
                 glideSlopeControlsWrapper.style.display = e.target.checked ? 'flex' : 'none';
             }
@@ -775,6 +800,7 @@ function initSettingsMenu() {
     if (glideSlopeRatioSlider) {
         glideSlopeRatioSlider.addEventListener('input', (e) => {
             state.glideSlopeRatio = parseFloat(e.target.value);
+            try { localStorage.setItem('pg-glide-slope-ratio', state.glideSlopeRatio); } catch(err) {}
             if (labelGlideSlopeRatio) {
                 labelGlideSlopeRatio.textContent = `${state.glideSlopeRatio}:1`;
             }
@@ -783,6 +809,7 @@ function initSettingsMenu() {
             }
         });
     }
+
 }
 
 function handleWptUpload(e) {
@@ -849,9 +876,37 @@ function drawTask() {
         taskTitleEl.textContent = taskName;
         taskTitleEl.style.display = 'block';
     }
+
+    // Extract coordinates from task definition if embedded
+    const embeddedWaypoints = parseTaskCoordinates(text);
+    if (Object.keys(embeddedWaypoints).length > 0) {
+        // Merge embedded coordinates with existing waypoints
+        // Embedded coordinates take precedence
+        state.waypoints = { ...state.waypoints, ...embeddedWaypoints };
+        console.log(`Extracted ${Object.keys(embeddedWaypoints).length} waypoints from task definition`);
+    }
     
     state.taskLayerGroup = L.featureGroup().addTo(state.map);
     state.task = [];
+
+    // Pre-scan for a header row to build a column index map.
+    // Expected header: "No \t Leg Dist. \t Id \t Radius \t Open \t Close \t Coordinates \t Altitude"
+    let colMap = null; // null means legacy format
+    for (let line of lines) {
+        line = line.trim();
+        if (!line) continue;
+        const headerParts = line.split(/\t+|\s{2,}/);
+        // Detect header by presence of both an "Id" and a "Radius" column
+        const lc = headerParts.map(p => p.toLowerCase().replace(/[.\s]/g, ''));
+        const idIdx     = lc.findIndex(p => p === 'id');
+        const radiusIdx = lc.findIndex(p => p === 'radius');
+        const distIdx   = lc.findIndex(p => p === 'legdist' || p === 'dist');
+        const noIdx     = lc.findIndex(p => p === 'no');
+        if (idIdx !== -1 && radiusIdx !== -1) {
+            colMap = { noIdx, idIdx, radiusIdx, distIdx };
+            break;
+        }
+    }
 
     let previousTaskPoint = null;
 
@@ -881,27 +936,61 @@ function drawTask() {
 
         const parts = line.split(/\t+|\s{2,}/);
         if (parts.length < 2) continue;
-        
-        const id = parts[0].trim();
-        let type = 'turnpoint';
-        const p1 = parts[1].toLowerCase().trim();
-        if (['launch', 'ss', 'es', 'goal'].includes(p1)) {
-            type = p1;
+
+        let id, type, radius = 0, dist = 0;
+
+        if (colMap && colMap.idIdx !== -1 && parts.length > colMap.idIdx) {
+            // --- Tabular format: use header-derived column indices ---
+            // Skip the header row itself
+            const firstCell = parts[0].toLowerCase().replace(/[.\s]/g, '');
+            if (firstCell === 'no') continue;
+
+            // Row number cell may contain the type keyword, e.g. "2 SS" or "7 ES"
+            const rowCell = (parts[colMap.noIdx] || parts[0]).toUpperCase();
+            id = parts[colMap.idIdx].replace(/[^\w-]/g, '').trim();
+            type = 'turnpoint';
+            if (rowCell.includes(' SS')) type = 'ss';
+            else if (rowCell.includes(' ES')) type = 'es';
+            else if (id.toUpperCase() === 'LAUNCH') type = 'launch';
+
+            // Radius column: strip non-numeric, convert km→m
+            if (colMap.radiusIdx !== -1 && parts.length > colMap.radiusIdx) {
+                const rawRadius = parts[colMap.radiusIdx];
+                const rVal = parseFloat(rawRadius.replace(/[^\d.]/g, ''));
+                if (!isNaN(rVal)) {
+                    radius = /km/i.test(rawRadius) ? rVal * 1000 : rVal;
+                }
+            }
+
+            // Leg distance column
+            if (colMap.distIdx !== -1 && parts.length > colMap.distIdx) {
+                const rawDist = parts[colMap.distIdx];
+                const dVal = parseFloat(rawDist.replace(/[^\d.]/g, ''));
+                if (!isNaN(dVal)) {
+                    dist = /km/i.test(rawDist) ? dVal * 1000 : dVal;
+                }
+            }
+        } else {
+            // --- Legacy format: ID is parts[0], optional type keyword is parts[1] ---
+            id = parts[0].trim();
+            type = 'turnpoint';
+            const p1 = parts[1].toLowerCase().trim();
+            if (['launch', 'ss', 'es', 'goal'].includes(p1)) type = p1;
+
+            // Extract radius and distance via regex (legacy order: radius first, dist second)
+            const matches = [...line.matchAll(/(\d+(?:\.\d+)?)\s*(m|km)/gi)];
+            if (matches.length >= 1) {
+                const rVal = parseFloat(matches[0][1]);
+                radius = matches[0][2].toLowerCase() === 'km' ? rVal * 1000 : rVal;
+            }
+            if (matches.length >= 2) {
+                const dVal = parseFloat(matches[1][1]);
+                dist = matches[1][2].toLowerCase() === 'km' ? dVal * 1000 : dVal;
+            }
         }
 
-        // Extract radius and distance using regex
-        const matches = [...line.matchAll(/(\d+(?:\.\d+)?)\s*(m|km)/gi)];
-        let radius = 0;
-        let dist = 0;
+        if (!id) continue;
 
-        if (matches.length >= 1) {
-            const rVal = parseFloat(matches[0][1]);
-            radius = matches[0][2].toLowerCase() === 'km' ? rVal * 1000 : rVal;
-        }
-        if (matches.length >= 2) {
-            const dVal = parseFloat(matches[1][1]);
-            dist = matches[1][2].toLowerCase() === 'km' ? dVal * 1000 : dVal;
-        }
 
         const wpt = state.waypoints[id];
         if (wpt) {
@@ -953,11 +1042,30 @@ function drawTask() {
     }
     
     if (state.task.length > 0) {
+        // If no turnpoint was explicitly typed as 'goal' (e.g. tabular format files
+        // where the last row has no keyword), promote the last turnpoint to goal.
+        const hasGoal = state.task.some(t => t.type === 'goal');
+        if (!hasGoal) {
+            state.task[state.task.length - 1].type = 'goal';
+        }
+
         state.map.invalidateSize();
         state.map.fitBounds(state.taskLayerGroup.getBounds(), { padding: [50, 50] });
         
         // Compute optimized task route distances
         state.optimizedTask = getOptimizedTaskDistances(state.task);
+
+        // Draw the optimized route on the map as a dashed white polyline
+        if (state.optimizedTask && state.optimizedTask.points) {
+            const optLatLngs = state.optimizedTask.points.map(p => [p.lat, p.lng]);
+            L.polyline(optLatLngs, {
+                color: 'white',
+                weight: 1.5,
+                opacity: 0.55,
+                dashArray: '6, 6',
+                interactive: false
+            }).addTo(state.taskLayerGroup);
+        }
         
         // Compute tactics for selected tracks now that we have a task
         state.tracks.forEach(track => {
@@ -1038,34 +1146,39 @@ async function fetchTerrainProfile() {
     const task = state.task;
     const goalIndex = task.findIndex(t => t.type === 'goal');
     const endGoalIdx = goalIndex !== -1 ? goalIndex : task.length - 1;
-    const totalTaskDist = calculateRemainingLegs(task, 0, endGoalIdx);
-    
+
+    // Use the optimized route points (cylinder-edge touch points) if available,
+    // falling back to center-to-center.
+    const optTask = state.optimizedTask;
+    const optPts  = optTask ? optTask.points : null;
+    const totalTaskDist = optTask ? optTask.totalDist : calculateRemainingLegs(task, 0, endGoalIdx);
+
     if (totalTaskDist <= 0 || endGoalIdx <= 0) return;
-    
+
     const samplePoints = [];
     const TOTAL_SAMPLES = 150;
-    
-    // Sample points along each leg proportional to leg distance
+
+    // Sample along each leg using optimized waypoints when available
     for (let i = 0; i < endGoalIdx; i++) {
-        const from = task[i];
-        const to = task[i + 1];
+        const from = optPts ? optPts[i]   : task[i];
+        const to   = optPts ? optPts[i+1] : task[i+1];
         const legDist = haversineDistance(from, to);
         const numSamples = Math.max(3, Math.round((legDist / totalTaskDist) * TOTAL_SAMPLES));
-        
-        const distAtFrom = totalTaskDist - calculateRemainingLegs(task, i, endGoalIdx);
-        const distAtTo = totalTaskDist - calculateRemainingLegs(task, i + 1, endGoalIdx);
-        
+
+        const distAtFrom = optPts ? optTask.distances[i]   : (totalTaskDist - calculateRemainingLegs(task, i,   endGoalIdx));
+        const distAtTo   = optPts ? optTask.distances[i+1] : (totalTaskDist - calculateRemainingLegs(task, i+1, endGoalIdx));
+
         for (let j = 0; j < numSamples; j++) {
             const t = j / numSamples;
-            const lat = from.lat + (to.lat - from.lat) * t;
-            const lng = from.lng + (to.lng - from.lng) * t;
+            const lat   = from.lat + (to.lat - from.lat) * t;
+            const lng   = from.lng + (to.lng - from.lng) * t;
             const distKm = distAtFrom + (distAtTo - distAtFrom) * t;
             samplePoints.push({ lat, lng, distKm });
         }
     }
     // Add final goal point
-    const goalTP = task[endGoalIdx];
-    samplePoints.push({ lat: goalTP.lat, lng: goalTP.lng, distKm: totalTaskDist });
+    const goalPt = optPts ? optPts[endGoalIdx] : task[endGoalIdx];
+    samplePoints.push({ lat: goalPt.lat, lng: goalPt.lng, distKm: totalTaskDist });
     
     // Check if local DEM contains these points
     if (state.localDem) {
