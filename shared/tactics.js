@@ -107,23 +107,38 @@ export function optimizeTaskRoute(task) {
     const N = task.length;
     if (N === 0) return [];
     
-    const Q = [];
-    for (let i = 0; i < N; i++) {
-        Q.push({ lat: task[i].lat, lng: task[i].lng });
+    // Find Start of Speed Section (SS) index
+    const ssIdx = task.findIndex(t => t.type === 'ss');
+    const startIdx = ssIdx >= 0 ? ssIdx : (N > 1 ? 1 : 0);
+    
+    const subTask = task.slice(startIdx);
+    const M = subTask.length;
+    
+    const Q_ss = [];
+    for (let i = 0; i < M; i++) {
+        Q_ss.push({ lat: subTask[i].lat, lng: subTask[i].lng });
     }
     
     const maxIterations = 15;
     for (let iter = 0; iter < maxIterations; iter++) {
-        for (let i = 1; i < N - 1; i++) {
-            const center = task[i];
+        // Optimize Q_ss[0] (Start Cylinder) to be on the boundary facing Q_ss[1]
+        if (M > 1 && subTask[0].radius > 0) {
+            const startCenter = subTask[0];
+            const nextPoint = Q_ss[1];
+            const brng = bearing(startCenter, nextPoint);
+            Q_ss[0] = destinationPoint(startCenter, startCenter.radius / 1000, brng);
+        }
+        
+        for (let i = 1; i < M - 1; i++) {
+            const center = subTask[i];
             const radiusKm = (center.radius || 0) / 1000;
             if (radiusKm <= 0) {
-                Q[i] = { lat: center.lat, lng: center.lng };
+                Q_ss[i] = { lat: center.lat, lng: center.lng };
                 continue;
             }
             
-            const prev = Q[i-1];
-            const next = Q[i+1];
+            const prev = Q_ss[i-1];
+            const next = Q_ss[i+1];
             
             let low = -Math.PI;
             let high = Math.PI;
@@ -143,15 +158,34 @@ export function optimizeTaskRoute(task) {
                     low = m1;
                 }
             }
-            Q[i] = destinationPoint(center, radiusKm, (low + high) / 2);
+            Q_ss[i] = destinationPoint(center, radiusKm, (low + high) / 2);
         }
     }
     
-    if (N > 1 && task[N-1].radius > 0) {
-        const goalCenter = task[N-1];
-        const prevPoint = Q[N-2];
+    // Final check for start cylinder
+    if (M > 1 && subTask[0].radius > 0) {
+        const startCenter = subTask[0];
+        const nextPoint = Q_ss[1];
+        const brng = bearing(startCenter, nextPoint);
+        Q_ss[0] = destinationPoint(startCenter, startCenter.radius / 1000, brng);
+    }
+    
+    // Final check for goal cylinder
+    if (M > 1 && subTask[M-1].radius > 0) {
+        const goalCenter = subTask[M-1];
+        const prevPoint = Q_ss[M-2];
         const brng = bearing(goalCenter, prevPoint);
-        Q[N-1] = destinationPoint(goalCenter, goalCenter.radius / 1000, brng);
+        Q_ss[M-1] = destinationPoint(goalCenter, goalCenter.radius / 1000, brng);
+    }
+    
+    const Q = [];
+    for (let i = 0; i < N; i++) {
+        if (i < startIdx) {
+            Q.push({ lat: Q_ss[0].lat, lng: Q_ss[0].lng });
+        } else {
+            const pt = Q_ss[i - startIdx];
+            Q.push({ lat: pt.lat, lng: pt.lng });
+        }
     }
     
     return Q;
@@ -484,6 +518,7 @@ export function analyzeTactics(points, task, startGateTime = null) {
         ssCrossTime: null,
         speedSectionTime: null,
         essCrossTime: null,
+        goalCrossTime: null,
         essCrossAlt: null,
         essGrNeededToGoal: null,
         finalGlideStartTime: null,
@@ -494,7 +529,8 @@ export function analyzeTactics(points, task, startGateTime = null) {
         grToEssSeries: [],  // Array of { time, gr }
         crossingDistances: {},
         maxSpeed10Sec: 0,
-        maxSpeed10SecIdx: -1
+        maxSpeed10SecIdx: -1,
+        speedSectionDist: (hasTask && essIndex !== -1 && task.length > 1) ? suffixDist[1] - suffixDist[essIndex] : 0
     };
 
     let targetIndex = hasTask ? Math.min(1, task.length - 1) : -1; // Start heading to first turnpoint after launch
@@ -532,6 +568,7 @@ export function analyzeTactics(points, task, startGateTime = null) {
                 if (target.type === 'es' && essCrossIdx === -1) essCrossIdx = i;
                 if (target.type === 'goal' && goalCrossIdx === -1) {
                     goalCrossIdx = i;
+                    metrics.goalCrossTime = p.time;
                     raceEndIdx = goalCrossIdx + 1; // Stop processing immediately once goal is crossed
                 }
                 
@@ -599,8 +636,9 @@ export function analyzeTactics(points, task, startGateTime = null) {
                 }
                 const essHeightAgl = Math.max(0.1, p.alt - refElev); // Still use goal elevation as ground floor
                 const grEss = (totalDistToEss * 1000) / essHeightAgl;
-                metrics.grToEssSeries.push({ time: p.time, gr: grEss });
+                metrics.grToEssSeries.push({ time: p.time, gr: grEss, distToEss: totalDistToEss });
             }
+
         }
     }
 
@@ -785,6 +823,43 @@ export function analyzeTactics(points, task, startGateTime = null) {
     const resSpeed = calculateMax10SecSpeed(points, raceStartIdx, raceEndIdx);
     metrics.maxSpeed10Sec = resSpeed.speed;
     metrics.maxSpeed10SecIdx = resSpeed.idx;
+
+    // Populate ss_trackpoints for leading points
+    if (hasTask && crossingIndices[1] !== undefined && essIndex !== -1) {
+        metrics.ss_trackpoints = [];
+        let minToEssSoFar = Infinity;
+        let bestPt = null;
+
+        const ssEndIdx = essCrossIdx !== -1 ? essCrossIdx : raceEndIdx - 1;
+        
+        for (let k = crossingIndices[1]; k <= ssEndIdx; k++) {
+            const p = points[k];
+            // distToEss is available in grToEssSeries if task exists and ess exists
+            const s = metrics.grToEssSeries[k];
+            if (!s || s.distToEss === undefined) continue;
+            
+            const distToEss = s.distToEss;
+            if (distToEss < minToEssSoFar) {
+                minToEssSoFar = distToEss;
+            }
+            
+            const ptData = {
+                time: p.time,
+                lat: p.lat,
+                lng: p.lng,
+                alt: p.alt,
+                distToEss: distToEss,
+                minDistToEss: minToEssSoFar
+            };
+            
+            metrics.ss_trackpoints.push(ptData);
+            
+            if (!bestPt || minToEssSoFar < bestPt.minDistToEss) {
+                bestPt = ptData;
+            }
+        }
+        metrics.best_ss_trackpoint = bestPt;
+    }
 
     return metrics;
 }

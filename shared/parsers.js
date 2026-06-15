@@ -40,7 +40,7 @@ export function parseIGC(text) {
                 }
                 const alt = gpsAlt !== null ? gpsAlt : baroAlt !== null ? baroAlt : 0;
 
-                if (!isNaN(lat) && !isNaN(lng)) {
+                if (!isNaN(lat) && !isNaN(lng) && !(lat === 0 && lng === 0)) {
                     points.push({ lat, lng, time, alt });
                 }
             } catch (e) {
@@ -77,7 +77,7 @@ export function parseGPX(text) {
             }
         }
         
-        if (!isNaN(lat) && !isNaN(lng)) {
+        if (!isNaN(lat) && !isNaN(lng) && !(lat === 0 && lng === 0)) {
             if (time !== undefined) {
                 points.push({ lat, lng, time, alt });
             } else {
@@ -102,7 +102,7 @@ export function parseKML(text) {
                 const lng = parseFloat(parts[0]);
                 const lat = parseFloat(parts[1]);
                 const alt = parts.length >= 3 ? parseFloat(parts[2]) : 0;
-                if (!isNaN(lat) && !isNaN(lng)) {
+                if (!isNaN(lat) && !isNaN(lng) && !(lat === 0 && lng === 0)) {
                     points.push({ lat, lng, alt });
                 }
             }

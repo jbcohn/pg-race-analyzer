@@ -1,0 +1,11 @@
+2023-06-25 Task 1 US Open of Paragliding
+No 	Leg Dist. 	Id 	Radius 	Open 	Close 	Coordinates 	Altitude
+1 	0.0 km 	LAUNCH 	400 m 	11:15 	13:05 	Lat: 47.80415 Lon: -120.03862 	1128 m
+2 SS 	2.8 km 	BUTTE 	3000 m 	12:45 	17:30 	Lat: 47.80693 Lon: -120.0343 	1167 m
+3 	17.8 km 	STRMMT 	8000 m 	12:45 	17:30 	Lat: 47.89667 Lon: -120.3528 	0 m
+4 	55.3 km 	GR703 	30000 m 	12:45 	17:30 	Lat: 47.34882 Lon: -119.85717 	0 m
+5 	95.0 km 	BRIDPT 	8000 m 	12:45 	17:30 	Lat: 48.00283 Lon: -119.6519 	262 m
+6 ES 	105.8 km 	MANSFL 	2000 m 	12:45 	17:30 	Lat: 47.81768 Lon: -119.64342 	694 m
+7 	107.4 km 	MANSFL 	400 m 	12:45 	17:30 	Lat: 47.81768 Lon: -119.64342 	694 m 
+Startgate: 	12:45:00
+Deadline: 	17:30:00

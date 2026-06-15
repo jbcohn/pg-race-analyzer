@@ -2,6 +2,8 @@ import { parseIGC, parseGPX, parseKML, ensureTimestamps } from './shared/parsers
 import { haversineDistance, bearing } from './shared/geo-math.js';
 import { parseWaypointFile, parseTaskCoordinates } from './shared/waypoint-parsers.js';
 import { analyzeTactics, calculateRemainingLegs, getOptimizedTaskDistances } from './shared/tactics.js';
+import { calculateLeadingPoints, calculateTimePoints, integratePgWeightCurve } from './shared/scoring.js';
+import { initAudio, playCoinSound } from './shared/audio.js';
 import { SideView } from './side-view.js';
 
 /**
@@ -45,7 +47,10 @@ const state = {
     activeTaskName: "No Task Active",
     topoMap: null,
     satelliteMap: null,
-    currentMapType: 'topo'
+    currentMapType: 'topo',
+    coinEnabled: true,
+    coinInterval: 3,
+    chartResolution: 500
 };
 
 // Pilot Colors mapping to CSS variables
@@ -91,6 +96,14 @@ function getPilotFullName(rawName) {
     name = name.replace(/[0-9]/g, '');
     let cleanName = name.replace(/[._-]/g, ' ').replace(/\s+/g, ' ').trim();
     return cleanName.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+}
+
+function resolveColor(color) {
+    if (color && typeof color === 'string' && color.startsWith('var(')) {
+        const varName = color.slice(4, -1).trim();
+        return getComputedStyle(document.documentElement).getPropertyValue(varName).trim() || '#ffffff';
+    }
+    return color;
 }
 
 function getPilotInitials(rawName) {
@@ -229,7 +242,14 @@ function initApp() {
     document.getElementById('wpt-upload').addEventListener('change', handleWptUpload);
     document.getElementById('btn-draw-task').addEventListener('click', drawTask);
     document.getElementById('btn-clear-task').addEventListener('click', clearTask);
-    document.getElementById('btn-play-pause').addEventListener('click', togglePlayback);
+    document.getElementById('btn-play-pause').addEventListener('click', () => {
+        try {
+            initAudio();
+        } catch (e) {
+            console.warn('Failed to init audio on play/pause click:', e);
+        }
+        togglePlayback();
+    });
     document.getElementById('btn-export-xlsx').addEventListener('click', exportStatsToXLSX);
     
     // Vertical resizer
@@ -322,9 +342,15 @@ function initApp() {
                 if (targetWidth < 350) targetWidth = 350;
                 rightPanelEl.style.width = `${targetWidth}px`;
                 
-                updateStatsAnalysis();
+                const btnTabLeading = document.getElementById('btn-tab-leading');
+                if (btnTabLeading && btnTabLeading.classList.contains('active')) {
+                    updateLeadingPointsChart();
+                } else {
+                    updateStatsAnalysis();
+                }
                 setTimeout(() => {
                     if (statsChart) statsChart.resize();
+                    if (leadPointsChart) leadPointsChart.resize();
                 }, 350);
             }
         });
@@ -332,6 +358,36 @@ function initApp() {
     if (closePanelBtn && rightPanelEl) {
         closePanelBtn.addEventListener('click', () => {
             rightPanelEl.classList.add('collapsed');
+        });
+    }
+
+    // Stats Tab Switching controls
+    const btnTabCorrelation = document.getElementById('btn-tab-correlation');
+    const btnTabLeading = document.getElementById('btn-tab-leading');
+    const tabCorrelationContent = document.getElementById('stats-tab-correlation-content');
+    const tabLeadingContent = document.getElementById('stats-tab-leading-content');
+
+    if (btnTabCorrelation && btnTabLeading && tabCorrelationContent && tabLeadingContent) {
+        btnTabCorrelation.addEventListener('click', () => {
+            btnTabCorrelation.classList.add('active');
+            btnTabLeading.classList.remove('active');
+            tabCorrelationContent.style.display = 'flex';
+            tabLeadingContent.style.display = 'none';
+            updateStatsAnalysis();
+            setTimeout(() => {
+                if (statsChart) statsChart.resize();
+            }, 50);
+        });
+
+        btnTabLeading.addEventListener('click', () => {
+            btnTabLeading.classList.add('active');
+            btnTabCorrelation.classList.remove('active');
+            tabLeadingContent.style.display = 'flex';
+            tabCorrelationContent.style.display = 'none';
+            updateLeadingPointsChart();
+            setTimeout(() => {
+                if (leadPointsChart) leadPointsChart.resize();
+            }, 50);
         });
     }
 
@@ -363,9 +419,8 @@ function initApp() {
             if (newWidth > maxAllowedWidth) newWidth = maxAllowedWidth;
             
             rightPanelEl.style.width = `${newWidth}px`;
-            if (statsChart) {
-                statsChart.resize();
-            }
+            if (statsChart) statsChart.resize();
+            if (leadPointsChart) leadPointsChart.resize();
         });
 
         document.addEventListener('mouseup', () => {
@@ -374,9 +429,8 @@ function initApp() {
                 rightPanelResizer.classList.remove('dragging');
                 document.body.style.cursor = 'default';
                 document.body.style.userSelect = '';
-                if (statsChart) {
-                    statsChart.resize();
-                }
+                if (statsChart) statsChart.resize();
+                if (leadPointsChart) leadPointsChart.resize();
             }
         });
     }
@@ -402,6 +456,7 @@ function initApp() {
                 rightPanelEl.style.width = `${currentWidth}px`;
             }
             if (statsChart) statsChart.resize();
+            if (leadPointsChart) leadPointsChart.resize();
         }
     });
     
@@ -410,46 +465,38 @@ function initApp() {
     if (chartXSelect) chartXSelect.addEventListener('change', updateStatsAnalysis);
     if (chartFitSelect) chartFitSelect.addEventListener('change', updateStatsAnalysis);
     
+    const chartResSelect = document.getElementById('select-chart-resolution');
+    if (chartResSelect) {
+        try {
+            const storedRes = localStorage.getItem('pg-chart-resolution');
+            if (storedRes !== null) {
+                state.chartResolution = parseFloat(storedRes) || 500;
+                chartResSelect.value = state.chartResolution.toString();
+            }
+        } catch (e) {}
+
+        chartResSelect.addEventListener('change', (e) => {
+            state.chartResolution = parseFloat(e.target.value) || 500;
+            try { localStorage.setItem('pg-chart-resolution', state.chartResolution); } catch(err) {}
+            updateLeadingPointsChart();
+        });
+
+        const leadXaxisRadios = document.querySelectorAll('input[name="lead-chart-xaxis"]');
+        leadXaxisRadios.forEach(radio => {
+            radio.addEventListener('change', () => {
+                updateLeadingPointsChart();
+            });
+        });
+    }
+    
     // Setup predefined tasks dropdown if manifest is available
     setupPredefinedTasks();
 
     // Restore persisted data from localStorage
     restoreFromStorage();
 
-    // Fetch and parse overall standings
-    fetch(`${encodePath('Tasks/overall_standings.txt')}?t=${Date.now()}`)
-        .then(res => {
-            if (!res.ok) {
-                throw new Error(`Failed to load overall standings: ${res.statusText}`);
-            }
-            return res.text();
-        })
-        .then(text => {
-            const lines = text.split('\n');
-            state.overallStandings = {};
-            lines.forEach(line => {
-                const trimmed = line.trim();
-                if (!trimmed || trimmed.startsWith('#')) return;
-                
-                let parts = trimmed.split('\t');
-                if (parts.length < 3) {
-                    parts = trimmed.split(/\s{2,}/);
-                }
-                
-                if (parts.length >= 3) {
-                    const rank = parseInt(parts[0].trim(), 10);
-                    const id = parts[1].trim();
-                    const name = parts[2].trim().toLowerCase();
-                    if (!isNaN(rank)) {
-                        state.overallStandings[name] = rank;
-                    }
-                }
-            });
-            console.log('Successfully loaded overall standings for', Object.keys(state.overallStandings).length, 'pilots');
-        })
-        .catch(err => {
-            console.error('Error fetching/parsing overall standings:', err);
-        });
+    // Fetch and parse overall standings (default to 2025 on startup)
+    loadOverallStandingsForTask('USOP 2025');
 
     // Select Top N Pilots event listener
     const btnApplyTopN = document.getElementById('btn-apply-top-n');
@@ -459,6 +506,41 @@ function initApp() {
 
     // Initialize Lift/Sink Overlay Controls
     initLiftSinkControls();
+}
+
+async function loadOverallStandingsForTask(taskId) {
+    let standingsFile = 'Tasks/USOP 2025 Chelan overall_standings.txt'; // default to 2025
+    if (taskId && taskId.includes('2023')) {
+        standingsFile = 'Tasks/USOP 2023 Chelan overall_standings.txt';
+    }
+    
+    try {
+        const res = await fetch(`${encodePath(standingsFile)}?t=${Date.now()}`);
+        if (!res.ok) throw new Error(`Failed to load overall standings: ${res.statusText}`);
+        const text = await res.text();
+        const lines = text.split('\n');
+        state.overallStandings = {};
+        lines.forEach(line => {
+            const trimmed = line.trim();
+            if (!trimmed || trimmed.startsWith('#')) return;
+            
+            let parts = trimmed.split('\t');
+            if (parts.length < 3) {
+                parts = trimmed.split(/\s{2,}/);
+            }
+            
+            if (parts.length >= 3) {
+                const rank = parseInt(parts[0].trim(), 10);
+                const name = parts[2].trim().toLowerCase();
+                if (!isNaN(rank)) {
+                    state.overallStandings[name] = rank;
+                }
+            }
+        });
+        console.log(`Successfully loaded overall standings (${standingsFile}) for`, Object.keys(state.overallStandings).length, 'pilots');
+    } catch (err) {
+        console.error('Error loading overall standings:', err);
+    }
 }
 
 function setupPredefinedTasks() {
@@ -514,6 +596,100 @@ function setupPredefinedTasks() {
                 try {
                     select.disabled = true;
                     
+                    // Stop playback if playing
+                    if (state.isPlaying) {
+                        togglePlayback();
+                    }
+
+                    // Load corresponding overall standings
+                    await loadOverallStandingsForTask(taskInfo.id);
+                    
+                    // Remove all track layers from the map
+                    state.tracks.forEach(t => {
+                        if (state.map && t.layerGroup) {
+                            state.map.removeLayer(t.layerGroup);
+                        }
+                    });
+                    
+                    // Clear tracks state
+                    state.tracks = [];
+                    state.minTime = Infinity;
+                    state.maxTime = -Infinity;
+                    state.currentTime = 0;
+                    
+                    // Reset scrubber and time display
+                    const scrubber = document.getElementById('timeline-scrubber');
+                    if (scrubber) {
+                        scrubber.value = 0;
+                        scrubber.disabled = true;
+                    }
+                    const timeDisplay = document.getElementById('time-display');
+                    if (timeDisplay) timeDisplay.textContent = '--:--:--';
+                    
+                    // Clear IndexedDB tracks
+                    const db = await getDB();
+                    if (db) {
+                        const tx = db.transaction(STORE_NAME, 'readwrite');
+                        tx.objectStore(STORE_NAME).clear();
+                        await new Promise((resolve, reject) => {
+                            tx.oncomplete = () => resolve();
+                            tx.onerror = (e) => reject(tx.error || e.target.error);
+                        });
+                    }
+                    try { localStorage.removeItem('pg-tracks'); } catch(err) {}
+                    
+                    // Clear waypoints state and cache
+                    state.waypoints = {};
+                    try { localStorage.removeItem('pg-waypoints'); } catch(err) {}
+                    
+                    // Reset waypoint upload label
+                    const wptLabel = document.querySelector('label[for="wpt-upload"]');
+                    if (wptLabel) {
+                        for (let node of wptLabel.childNodes) {
+                            if (node.nodeType === Node.TEXT_NODE && node.textContent.trim().length > 0) {
+                                node.textContent = ' Upload Waypoints (.wpt/.cup) ';
+                                break;
+                            }
+                        }
+                    }
+                    
+                    // Reset file inputs
+                    const fileUploadInput = document.getElementById('file-upload');
+                    if (fileUploadInput) fileUploadInput.value = '';
+                    const wptUploadInput = document.getElementById('wpt-upload');
+                    if (wptUploadInput) wptUploadInput.value = '';
+                    
+                    // Clear existing task representation on map and state
+                    if (state.taskLayerGroup) {
+                        state.map.removeLayer(state.taskLayerGroup);
+                        state.taskLayerGroup = null;
+                    }
+                    state.task = [];
+                    state.optimizedTask = null;
+                    state.terrainProfile = null;
+                    state.startGateTime = null;
+                    state.startGateTimeStr = null;
+                    state.deadlineTime = null;
+                    state.deadlineTimeStr = null;
+                    
+                    const gateInfoEl = document.getElementById('task-gate-info');
+                    if (gateInfoEl) {
+                        gateInfoEl.innerHTML = '';
+                    }
+                    
+                    // Clear task text
+                    document.getElementById('task-textarea').value = '';
+                    try { localStorage.removeItem('pg-task-text'); } catch(err) {}
+                    
+                    // Clear Lift/Sink overlay
+                    if (state.liftSinkLayerGroup) {
+                        state.liftSinkLayerGroup.clearLayers();
+                    }
+                    
+                    // Render empty state immediately
+                    if (sideView) sideView.render(state);
+                    updatePilotListUI();
+                    
                     // 1. Load waypoints
                     if (manifest.waypoint_file) {
                         if (loaderTextEl) loaderTextEl.textContent = 'Loading waypoints...';
@@ -534,38 +710,7 @@ function setupPredefinedTasks() {
                         drawTask();
                     }
                     
-                    // 3. Clear existing tracks
-                    if (state.isPlaying) {
-                        togglePlayback();
-                    }
-                    state.tracks.forEach(t => {
-                        if (state.map && t.layerGroup) {
-                            state.map.removeLayer(t.layerGroup);
-                        }
-                    });
-                    state.tracks = [];
-                    state.minTime = Infinity;
-                    state.maxTime = -Infinity;
-                    state.currentTime = 0;
-                    
-                    const scrubber = document.getElementById('timeline-scrubber');
-                    if (scrubber) {
-                        scrubber.value = 0;
-                        scrubber.disabled = true;
-                    }
-                    const timeDisplay = document.getElementById('time-display');
-                    if (timeDisplay) timeDisplay.textContent = '--:--:--';
-                    
-                    // Clear IndexedDB store
-                    const db = await getDB();
-                    if (db) {
-                        const tx = db.transaction(STORE_NAME, 'readwrite');
-                        tx.objectStore(STORE_NAME).clear();
-                        await new Promise((resolve, reject) => {
-                            tx.oncomplete = () => resolve();
-                            tx.onerror = (e) => reject(tx.error || e.target.error);
-                        });
-                    }
+                    // 3. Clear existing tracks (Done at start)
                     
                     // 4. Fetch and load the track logs in parallel with concurrency limit of 6
                     const igcFiles = taskInfo.igc_files;
@@ -745,6 +890,14 @@ function initSettingsMenu() {
                 state.drawGlideSlope = chk.checked;
                 wrapper.style.display = chk.checked ? 'flex' : 'none';
             }
+            
+            // Sync coin controls wrapper on every open
+            const coinChk = document.getElementById('chk-coin-enable');
+            const coinWrapper = document.getElementById('coin-controls-wrapper');
+            if (coinChk && coinWrapper) {
+                state.coinEnabled = coinChk.checked;
+                coinWrapper.style.display = coinChk.checked ? 'flex' : 'none';
+            }
         });
     }
     
@@ -810,6 +963,44 @@ function initSettingsMenu() {
         });
     }
 
+    // Coin Animation Controls wiring
+    const coinEnableCheckbox = document.getElementById('chk-coin-enable');
+    const coinIntervalInput = document.getElementById('input-coin-interval');
+    const coinControlsWrapper = document.getElementById('coin-controls-wrapper');
+
+    if (coinEnableCheckbox) {
+        // Restore persisted state
+        try {
+            const stored = localStorage.getItem('pg-coin-enable');
+            if (stored !== null) state.coinEnabled = stored === 'true';
+            const storedInterval = localStorage.getItem('pg-coin-interval');
+            if (storedInterval !== null) state.coinInterval = parseFloat(storedInterval);
+        } catch(e) {}
+
+        // Sync DOM to restored state
+        coinEnableCheckbox.checked = state.coinEnabled;
+        if (coinControlsWrapper) {
+            coinControlsWrapper.style.display = state.coinEnabled ? 'flex' : 'none';
+        }
+        if (coinIntervalInput) coinIntervalInput.value = state.coinInterval;
+
+        coinEnableCheckbox.addEventListener('change', (e) => {
+            state.coinEnabled = e.target.checked;
+            try { localStorage.setItem('pg-coin-enable', state.coinEnabled); } catch(err) {}
+            if (coinControlsWrapper) {
+                coinControlsWrapper.style.display = e.target.checked ? 'flex' : 'none';
+            }
+        });
+    }
+
+    if (coinIntervalInput) {
+        coinIntervalInput.addEventListener('input', (e) => {
+            let val = parseFloat(e.target.value);
+            if (isNaN(val) || val <= 0) val = 1;
+            state.coinInterval = val;
+            try { localStorage.setItem('pg-coin-interval', state.coinInterval); } catch(err) {}
+        });
+    }
 }
 
 function handleWptUpload(e) {
@@ -955,19 +1146,42 @@ function drawTask() {
 
             // Radius column: strip non-numeric, convert km→m
             if (colMap.radiusIdx !== -1 && parts.length > colMap.radiusIdx) {
-                const rawRadius = parts[colMap.radiusIdx];
+                let rawRadius = parts[colMap.radiusIdx];
+                // If the radius cell contains a type keyword, columns are shifted
+                if (['launch', 'ss', 'es', 'goal'].includes(rawRadius.toLowerCase().trim())) {
+                    type = rawRadius.toLowerCase().trim();
+                    rawRadius = parts[colMap.radiusIdx + 1] || rawRadius;
+                }
                 const rVal = parseFloat(rawRadius.replace(/[^\d.]/g, ''));
                 if (!isNaN(rVal)) {
                     radius = /km/i.test(rawRadius) ? rVal * 1000 : rVal;
+                } else {
+                    // Fallback to regex
+                    const matches = [...line.matchAll(/(\d+(?:\.\d+)?)\s*(m|km)/gi)];
+                    if (matches.length >= 1) {
+                        const rVal2 = parseFloat(matches[0][1]);
+                        radius = matches[0][2].toLowerCase() === 'km' ? rVal2 * 1000 : rVal2;
+                    }
                 }
             }
 
             // Leg distance column
             if (colMap.distIdx !== -1 && parts.length > colMap.distIdx) {
-                const rawDist = parts[colMap.distIdx];
+                let rawDist = parts[colMap.distIdx];
+                // If radius cell contained a type keyword, the distance cell is also shifted
+                if (parts[colMap.radiusIdx] && ['launch', 'ss', 'es', 'goal'].includes(parts[colMap.radiusIdx].toLowerCase().trim())) {
+                    rawDist = parts[colMap.distIdx + 1] || rawDist;
+                }
                 const dVal = parseFloat(rawDist.replace(/[^\d.]/g, ''));
                 if (!isNaN(dVal)) {
                     dist = /km/i.test(rawDist) ? dVal * 1000 : dVal;
+                } else {
+                    // Fallback to regex
+                    const matches = [...line.matchAll(/(\d+(?:\.\d+)?)\s*(m|km)/gi)];
+                    if (matches.length >= 2) {
+                        const dVal2 = parseFloat(matches[1][1]);
+                        dist = matches[1][2].toLowerCase() === 'km' ? dVal2 * 1000 : dVal2;
+                    }
                 }
             }
         } else {
@@ -1772,6 +1986,8 @@ function clearTracks() {
     resetPredefinedTaskSelect();
     
     if (sideView) sideView.render(state);
+    updateStatsAnalysis();
+    updateLeadingPointsChart();
     
     // Clear Lift/Sink overlay
     if (state.liftSinkLayerGroup) {
@@ -1876,6 +2092,9 @@ function updatePilotListUI() {
     // Recompute speed section times (either from startGateTime or minimum ssCrossTime fallback)
     recomputeSpeedSectionTimes();
 
+    // Calculate Leading Points once initially or re-calculate
+    updateRealTimeScores();
+
     state.tracks.forEach(track => {
         let fgDistStr = '--';
         let fgGrStr = '--';
@@ -1914,6 +2133,9 @@ function updatePilotListUI() {
             essTimeStr = formatTime(track.tactics.speedSectionTime);
         }
 
+        const leadPtsStr = (track.leadingPoints !== undefined && track.leadingPoints !== null) ? track.leadingPoints.toFixed(1) : '--';
+        const timePtsStr = (track.timePoints !== undefined && track.timePoints !== null) ? track.timePoints.toFixed(1) : '--';
+
         // Main Pilot Row
         const row = document.createElement('tr');
         row.className = 'pilot-row';
@@ -1929,6 +2151,8 @@ function updatePilotListUI() {
             <td class="stat-value" id="dist-${track.id}">--</td>
             <td class="stat-value" id="gr-${track.id}">--</td>
             <td class="stat-value" id="grgoal-${track.id}">--</td>
+            <td class="stat-value" id="leadpts-${track.id}">${leadPtsStr}</td>
+            <td class="stat-value" id="timepts-${track.id}">${timePtsStr}</td>
         `;
         
         // Collapsed Details Row
@@ -1937,7 +2161,7 @@ function updatePilotListUI() {
         detailsRow.id = `details-${track.id}`;
         detailsRow.style.display = 'none';
         detailsRow.innerHTML = `
-            <td colspan="6">
+            <td colspan="8">
                 <div class="pilot-details-content">
                     <div class="detail-item"><strong>FG Dist:</strong> <span>${fgDistStr} km</span></div>
                     <div class="detail-item"><strong>FG GR:</strong> <span>${fgGrStr}</span></div>
@@ -1980,6 +2204,7 @@ function updatePilotListUI() {
     const rightPanelEl = document.getElementById('right-panel');
     if (rightPanelEl && !rightPanelEl.classList.contains('collapsed')) {
         updateStatsAnalysis();
+        updateLeadingPointsChart();
     }
 }
 
@@ -2111,11 +2336,147 @@ function updatePlaybackState() {
         sortPilotList();
     }
     
+    updateRealTimeScores();
+    
     // Render side view once per frame
     if (sideView) sideView.render(state);
 
     // Update Lift/Sink map overlay
     updateLiftSinkOverlay();
+}
+
+let lastScoreUpdatePerf = 0;
+
+function updateRealTimeScores() {
+    if (!state.task || state.task.length === 0 || !state.tracks || state.tracks.length === 0) return;
+
+    // Throttle to roughly 10 FPS
+    const now = performance.now();
+    if (now - lastScoreUpdatePerf < 100) return;
+    lastScoreUpdatePerf = now;
+
+    let speedSectionDist = 0;
+    let minSSCrossTime = Infinity;
+    let lastOutlandingTime = 0;
+    let lastEssTime = 0;
+
+    state.tracks.forEach(t => {
+        if (t.tactics) {
+            if (t.tactics.speedSectionDist > speedSectionDist) {
+                speedSectionDist = t.tactics.speedSectionDist;
+            }
+            if (t.tactics.essCrossTime) {
+                if (t.tactics.essCrossTime > lastEssTime) lastEssTime = t.tactics.essCrossTime;
+            } else if (t.points && t.points.length > 0) {
+                const lastPtTime = t.points[t.points.length - 1].time;
+                if (lastPtTime > lastOutlandingTime) lastOutlandingTime = lastPtTime;
+            }
+            if (t.tactics.ssCrossTime !== null && t.tactics.ssCrossTime < minSSCrossTime) {
+                minSSCrossTime = t.tactics.ssCrossTime;
+            }
+        }
+    });
+
+    const firstStartTime = state.startGateTime !== null ? state.startGateTime : (minSSCrossTime !== Infinity ? minSSCrossTime : 0);
+
+    calculateLeadingPoints(
+        state.tracks, 
+        162.5, 
+        speedSectionDist, 
+        state.deadlineTime || Infinity, 
+        firstStartTime, 
+        lastOutlandingTime, 
+        lastEssTime,
+        state.currentTime
+    );
+
+    // Call calculateTimePoints only if we're near the end of the race, or let it evaluate dynamically
+    // In GAP, time points are given if they reached ESS, which implies playback reached their ESS time.
+    calculateTimePoints(state.tracks, 202.85, state.currentTime);
+
+    state.tracks.forEach(track => {
+        const leadPtsEl = document.getElementById(`leadpts-${track.id}`);
+        if (leadPtsEl) {
+            const leadPtsStr = (track.leadingPoints !== undefined && track.leadingPoints !== null) ? track.leadingPoints.toFixed(1) : '--';
+            leadPtsEl.textContent = leadPtsStr;
+        }
+
+        const timePtsEl = document.getElementById(`timepts-${track.id}`);
+        if (timePtsEl) {
+            const timePtsStr = (track.timePoints !== undefined && track.timePoints !== null) ? track.timePoints.toFixed(1) : '--';
+            timePtsEl.textContent = timePtsStr;
+        }
+        
+        if (track.leadingPoints !== undefined && track.leadingPoints !== null) {
+            const coinInterval = state.coinInterval || 3;
+            const currentMilestone = Math.floor(track.leadingPoints / coinInterval);
+            if (track.lastCoinMilestone === undefined) {
+                track.lastCoinMilestone = currentMilestone;
+            } else if (currentMilestone > track.lastCoinMilestone) {
+                if (state.isPlaying && state.coinEnabled) {
+                    const pointGain = (currentMilestone - track.lastCoinMilestone) * coinInterval;
+                    showCoinAnimation(track, pointGain);
+                    playCoinSound();
+                }
+                track.lastCoinMilestone = currentMilestone;
+            } else if (currentMilestone < track.lastCoinMilestone) {
+                track.lastCoinMilestone = currentMilestone;
+            }
+        }
+    });
+}
+
+function showCoinAnimation(track, value = 1) {
+    const displayVal = Math.round(value);
+    const text = displayVal > 0 ? `+${displayVal}` : '';
+    if (!text) return;
+
+    // 1. Map Animation
+    if (state.map && track.marker) {
+        const latlng = track.marker.getLatLng();
+        if (latlng) {
+            const mapPoint = state.map.latLngToContainerPoint(latlng);
+            const mapContainer = state.map.getContainer();
+            
+            const coin = document.createElement('div');
+            coin.className = 'coin-popup';
+            coin.innerHTML = text;
+            coin.style.left = `${mapPoint.x - 10}px`;
+            coin.style.top = `${mapPoint.y - 10}px`;
+            coin.style.color = track.color;
+            coin.style.textShadow = '1px 1px 0 #000';
+            
+            mapContainer.appendChild(coin);
+            
+            setTimeout(() => {
+                if (mapContainer.contains(coin)) {
+                    mapContainer.removeChild(coin);
+                }
+            }, 800);
+        }
+    }
+    
+    // 2. Side View Animation
+    if (sideView && sideView.pilotCoords && sideView.container) {
+        const pCoord = sideView.pilotCoords.find(p => p.track.id === track.id);
+        if (pCoord) {
+            const coinSV = document.createElement('div');
+            coinSV.className = 'coin-popup';
+            coinSV.innerHTML = text;
+            coinSV.style.left = `${pCoord.x - 10}px`;
+            coinSV.style.top = `${pCoord.y - 10}px`;
+            coinSV.style.color = track.color;
+            coinSV.style.textShadow = '1px 1px 0 #000';
+            
+            sideView.container.appendChild(coinSV);
+            
+            setTimeout(() => {
+                if (sideView.container.contains(coinSV)) {
+                    sideView.container.removeChild(coinSV);
+                }
+            }, 800);
+        }
+    }
 }
 
 function sortPilotList() {
@@ -2309,24 +2670,25 @@ function updatePilotMarker(track, currentPos, prevPos) {
                 groundElevFt = profile[closestIdx].elevFt;
             }
             
-            // 3. Fallback to distKm-based interpolation if all else fails
-            if (groundElevFt === null && track.tactics && track.tactics.grToGoalSeries) {
-                if (currentIdx < track.tactics.grToGoalSeries.length) {
-                    const s = track.tactics.grToGoalSeries[currentIdx];
-                    const distFlown = s.distFlown !== undefined ? s.distFlown : 0;
-                    if (distFlown <= profile[0].distKm) {
-                        groundElevFt = profile[0].elevFt;
-                    } else if (distFlown >= profile[profile.length - 1].distKm) {
-                        groundElevFt = profile[profile.length - 1].elevFt;
-                    } else {
-                        for (let i = 0; i < profile.length - 1; i++) {
-                            const p1 = profile[i];
-                            const p2 = profile[i + 1];
-                            if (distFlown >= p1.distKm && distFlown <= p2.distKm) {
-                                const ratio = (distFlown - p1.distKm) / (p2.distKm - p1.distKm);
-                                groundElevFt = p1.elevFt + ratio * (p2.elevFt - p1.elevFt);
-                                break;
-                            }
+            if (groundElevFt === null && track.tactics && track.tactics.grToGoalSeries && track.tactics.grToGoalSeries.length > 0) {
+                let lookupIdx = currentIdx;
+                if (lookupIdx >= track.tactics.grToGoalSeries.length) {
+                    lookupIdx = track.tactics.grToGoalSeries.length - 1;
+                }
+                const s = track.tactics.grToGoalSeries[lookupIdx];
+                const distFlown = s.distFlown !== undefined ? s.distFlown : 0;
+                if (distFlown <= profile[0].distKm) {
+                    groundElevFt = profile[0].elevFt;
+                } else if (distFlown >= profile[profile.length - 1].distKm) {
+                    groundElevFt = profile[profile.length - 1].elevFt;
+                } else {
+                    for (let i = 0; i < profile.length - 1; i++) {
+                        const p1 = profile[i];
+                        const p2 = profile[i + 1];
+                        if (distFlown >= p1.distKm && distFlown <= p2.distKm) {
+                            const ratio = (distFlown - p1.distKm) / (p2.distKm - p1.distKm);
+                            groundElevFt = p1.elevFt + ratio * (p2.elevFt - p1.elevFt);
+                            break;
                         }
                     }
                 }
@@ -2371,21 +2733,23 @@ function updatePilotMarker(track, currentPos, prevPos) {
     // 2. GR to Goal (goes into the new GR to Goal column if task is available)
     const grGoalEl = document.getElementById(`grgoal-${track.id}`);
     if (track.tactics && track.tactics.grToGoalSeries && track.tactics.grToGoalSeries.length > 0) {
-        const idx = track.currentPosIndex || 0;
-        if (idx < track.tactics.grToGoalSeries.length) {
-            const grGoal = track.tactics.grToGoalSeries[idx].gr;
-            const distGoal = track.tactics.grToGoalSeries[idx].distToGoal;
-            
-            track.currentDistToGoal = distGoal;
-            track.currentGRGoal = grGoal;
-            
-            if (distEl) distEl.textContent = (distGoal !== null && distGoal !== undefined) ? (distGoal <= 0.01 ? 'Goal' : distGoal.toFixed(1)) : '--';
-            if (grGoalEl) {
-                if (distGoal <= 0.01) {
-                    grGoalEl.textContent = 'Goal';
-                } else {
-                    grGoalEl.textContent = (grGoal !== null && grGoal !== undefined) ? (grGoal > 100 ? '99+' : grGoal.toFixed(1)) : '--';
-                }
+        let idx = track.currentPosIndex || 0;
+        if (idx >= track.tactics.grToGoalSeries.length) {
+            idx = track.tactics.grToGoalSeries.length - 1;
+        }
+        
+        const grGoal = track.tactics.grToGoalSeries[idx].gr;
+        const distGoal = track.tactics.grToGoalSeries[idx].distToGoal;
+        
+        track.currentDistToGoal = distGoal;
+        track.currentGRGoal = grGoal;
+        
+        if (distEl) distEl.textContent = (distGoal !== null && distGoal !== undefined) ? (distGoal <= 0.0 ? 'Goal' : distGoal.toFixed(1)) : '--';
+        if (grGoalEl) {
+            if (distGoal <= 0.0) {
+                grGoalEl.textContent = 'Goal';
+            } else {
+                grGoalEl.textContent = (grGoal !== null && grGoal !== undefined) ? (grGoal > 100 ? '99+' : grGoal.toFixed(1)) : '--';
             }
         }
     } else {
@@ -2765,6 +3129,7 @@ function exportStatsToXLSX() {
 }
 
 let statsChart = null;
+let leadPointsChart = null;
 
 function getXValue(track, type) {
     if (!track.tactics) return null;
@@ -3067,7 +3432,7 @@ function updateStatsAnalysis() {
         pilotId: p.pilot.id
     }));
     
-    const pointColors = dataPoints.map(p => p.pilot.color);
+    const pointColors = dataPoints.map(p => resolveColor(p.pilot.color));
     
     const chartData = {
         datasets: [
@@ -3177,6 +3542,298 @@ function updateStatsAnalysis() {
                                 }
                             }
                         }
+                    }
+                }
+            }
+        });
+    }
+}
+
+function updateLeadingPointsChart() {
+    const canvas = document.getElementById('lead-points-chart');
+    if (!canvas) return;
+
+    if (!state.task || state.task.length === 0 || !state.tracks || state.tracks.length === 0) {
+        if (leadPointsChart) {
+            leadPointsChart.destroy();
+            leadPointsChart = null;
+        }
+        return;
+    }
+
+    // Determine speed section parameters
+    let speedSectionDist = 0;
+    let minSSCrossTime = Infinity;
+    let lastEssTime = 0;
+    let lastOutlandingTime = 0;
+
+    state.tracks.forEach(t => {
+        if (t.tactics) {
+            if (t.tactics.speedSectionDist > speedSectionDist) {
+                speedSectionDist = t.tactics.speedSectionDist;
+            }
+            if (t.tactics.essCrossTime) {
+                if (t.tactics.essCrossTime > lastEssTime) lastEssTime = t.tactics.essCrossTime;
+            } else if (t.points && t.points.length > 0) {
+                const lastPtTime = t.points[t.points.length - 1].time;
+                if (lastPtTime > lastOutlandingTime) lastOutlandingTime = lastPtTime;
+            }
+            if (t.tactics.ssCrossTime !== null && t.tactics.ssCrossTime < minSSCrossTime) {
+                minSSCrossTime = t.tactics.ssCrossTime;
+            }
+        }
+    });
+
+    if (speedSectionDist <= 0) return;
+
+    const firstStartTime = state.startGateTime !== null ? state.startGateTime : (minSSCrossTime !== Infinity ? minSSCrossTime : 0);
+    const taskDeadline = state.deadlineTime || Infinity;
+    const maxTime = Math.max(0, Math.min(Math.max(lastOutlandingTime, lastEssTime), taskDeadline) - firstStartTime);
+
+    // 1. Pre-calculate cumulative leading areas for each track
+    state.tracks.forEach(track => {
+        if (track.visible === false || !track.tactics || !track.tactics.ss_trackpoints || track.tactics.ss_trackpoints.length === 0) {
+            return;
+        }
+
+        const ssPts = track.tactics.ss_trackpoints;
+        let minDistSoFarPrev = ssPts[0].minDistToEss;
+        let cumLeadingArea = 0;
+        let cumWeight = 0;
+
+        ssPts[0].cumLeadingArea = 0;
+        ssPts[0].cumWeight = 0;
+        ssPts[0].distFlown = Math.max(0, speedSectionDist - ssPts[0].minDistToEss);
+
+        for (let i = 1; i < ssPts.length; i++) {
+            const currPt = ssPts[i];
+            const minToEssCurr = currPt.minDistToEss;
+            
+            const donePrev = 1.0 - (minDistSoFarPrev / speedSectionDist);
+            const doneCurr = 1.0 - (minToEssCurr / speedSectionDist);
+            const weight = integratePgWeightCurve(donePrev, doneCurr);
+            
+            const taskTime = Math.max(0, Math.min(currPt.time, taskDeadline) - firstStartTime);
+            cumLeadingArea += taskTime * weight;
+            cumWeight += weight;
+            
+            currPt.cumLeadingArea = cumLeadingArea;
+            currPt.cumWeight = cumWeight;
+            currPt.distFlown = Math.max(0, speedSectionDist - minToEssCurr);
+            
+            minDistSoFarPrev = minToEssCurr;
+        }
+    });
+
+    // Determine X-axis mode
+    const isTimeMode = document.querySelector('input[name="lead-chart-xaxis"]:checked')?.value === 'time';
+    const resMeters = state.chartResolution || 500;
+    const datasets = [];
+
+    // Ensure final leading points are computed
+    const availableLeadPoints = 162.5;
+    calculateLeadingPoints(
+        state.tracks,
+        availableLeadPoints,
+        speedSectionDist,
+        taskDeadline,
+        firstStartTime,
+        lastOutlandingTime,
+        lastEssTime
+    );
+
+    let steps = [];
+    let xMax = 0;
+
+    if (isTimeMode) {
+        // Time Mode: steps in seconds, resolution scales: 500 -> 300s, 50 -> 30s, etc.
+        const stepSec = resMeters * 0.6;
+        const maxTimeSeconds = maxTime;
+        let currentT = 0;
+        while (currentT < maxTimeSeconds) {
+            steps.push(currentT);
+            currentT += stepSec;
+        }
+        if (steps.length === 0 || steps[steps.length - 1] < maxTimeSeconds) {
+            steps.push(maxTimeSeconds);
+        }
+        xMax = maxTimeSeconds / 60.0; // minutes
+    } else {
+        // Distance Mode: steps in km, resolution scales: 500 -> 0.5km
+        const stepKm = resMeters / 1000.0;
+        let currentX = 0;
+        while (currentX < speedSectionDist) {
+            steps.push(currentX);
+            currentX += stepKm;
+        }
+        if (steps.length === 0 || steps[steps.length - 1] < speedSectionDist) {
+            steps.push(speedSectionDist);
+        }
+        xMax = speedSectionDist;
+    }
+
+    state.tracks.forEach(track => {
+        if (track.visible === false || !track.tactics || !track.tactics.ss_trackpoints || track.tactics.ss_trackpoints.length === 0) {
+            return;
+        }
+
+        const ssPts = track.tactics.ss_trackpoints;
+        const distFlownFinal = ssPts[ssPts.length - 1].distFlown;
+        const finalLeadPts = track.tactics.finalLeadingPoints || 0;
+        const totalFlightWeight = integratePgWeightCurve(0, distFlownFinal / speedSectionDist);
+
+        const linePoints = [];
+
+        if (isTimeMode) {
+            // Calculate points accumulated at each time step T (in seconds)
+            steps.forEach(T => {
+                let currentLeadWeight = 0;
+                let minDistSoFarPrev = ssPts[0].minDistToEss;
+
+                for (let i = 1; i < ssPts.length; i++) {
+                    const currPt = ssPts[i];
+                    const minToEssCurr = currPt.minDistToEss;
+                    
+                    const donePrev = 1.0 - (minDistSoFarPrev / speedSectionDist);
+                    const doneCurr = 1.0 - (minToEssCurr / speedSectionDist);
+                    const weight = integratePgWeightCurve(donePrev, doneCurr);
+                    
+                    if (currPt.time - firstStartTime <= T) {
+                        currentLeadWeight += weight;
+                    } else {
+                        break;
+                    }
+                    
+                    minDistSoFarPrev = minToEssCurr;
+                }
+
+                const ratio = totalFlightWeight > 0 ? currentLeadWeight / totalFlightWeight : 0;
+                const pts = finalLeadPts * ratio;
+
+                linePoints.push({
+                    x: T / 60.0, // X axis in minutes
+                    y: parseFloat(pts.toFixed(1))
+                });
+            });
+        } else {
+            // Distance mode X is in km
+            steps.forEach(X => {
+                let pts = 0;
+                if (X <= distFlownFinal) {
+                    const cumWeight = integratePgWeightCurve(0, X / speedSectionDist);
+                    const ratio = totalFlightWeight > 0 ? cumWeight / totalFlightWeight : 0;
+                    pts = finalLeadPts * ratio;
+                } else {
+                    pts = finalLeadPts;
+                }
+                linePoints.push({
+                    x: X,
+                    y: parseFloat(pts.toFixed(1))
+                });
+            });
+        }
+
+        const resolvedColor = resolveColor(track.color);
+        datasets.push({
+            label: track.fullName || track.name,
+            data: linePoints,
+            borderColor: resolvedColor,
+            backgroundColor: resolvedColor + '22',
+            borderWidth: 2,
+            pointRadius: 0,
+            pointHoverRadius: 4,
+            fill: false,
+            tension: 0.1
+        });
+    });
+
+    const ctx = canvas.getContext('2d');
+    const chartData = { datasets };
+
+    if (leadPointsChart) {
+        leadPointsChart.data = chartData;
+        leadPointsChart.options.scales.x.max = xMax;
+        leadPointsChart.options.scales.x.title.text = isTimeMode ? 'Elapsed Time along SS (min)' : 'Distance Flown along SS (km)';
+        
+        // Update tooltip callback for the correct units
+        leadPointsChart.options.plugins.tooltip.callbacks.title = function(context) {
+            if (context.length > 0) {
+                return isTimeMode 
+                    ? `Time along SS: ${context[0].raw.x.toFixed(1)} min`
+                    : `Distance Flown: ${context[0].raw.x.toFixed(1)} km`;
+            }
+            return '';
+        };
+
+        leadPointsChart.update();
+    } else {
+        leadPointsChart = new Chart(ctx, {
+            type: 'line',
+            data: chartData,
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'top',
+                        labels: {
+                            color: '#e2e8f0',
+                            font: {
+                                size: 10
+                            },
+                            boxWidth: 12
+                        }
+                    },
+                    tooltip: {
+                        mode: 'index',
+                        intersect: false,
+                        callbacks: {
+                            title: function(context) {
+                                if (context.length > 0) {
+                                    return isTimeMode 
+                                        ? `Time along SS: ${context[0].raw.x.toFixed(1)} min`
+                                        : `Distance Flown: ${context[0].raw.x.toFixed(1)} km`;
+                                }
+                                return '';
+                            },
+                            label: function(context) {
+                                return `${context.dataset.label}: ${context.raw.y.toFixed(1)} pts`;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        type: 'linear',
+                        position: 'bottom',
+                        title: {
+                            display: true,
+                            text: isTimeMode ? 'Elapsed Time along SS (min)' : 'Distance Flown along SS (km)',
+                            color: '#e2e8f0'
+                        },
+                        grid: {
+                            color: 'rgba(255, 255, 255, 0.05)'
+                        },
+                        ticks: {
+                            color: '#94a3b8'
+                        },
+                        min: 0,
+                        max: xMax
+                    },
+                    y: {
+                        title: {
+                            display: true,
+                            text: 'Accumulated Leading Points',
+                            color: '#e2e8f0'
+                        },
+                        grid: {
+                            color: 'rgba(255, 255, 255, 0.05)'
+                        },
+                        ticks: {
+                            color: '#94a3b8'
+                        },
+                        min: 0
                     }
                 }
             }
@@ -3552,10 +4209,10 @@ function applyTopNSelection() {
         while (idx < pts.length - 1 && pts[idx + 1].time < state.currentTime) idx++;
         while (idx > 0 && pts[idx].time > state.currentTime) idx--;
         
-        if (idx < track.tactics.grToGoalSeries.length) {
-            return track.tactics.grToGoalSeries[idx].distToGoal;
+        if (idx >= track.tactics.grToGoalSeries.length) {
+            idx = track.tactics.grToGoalSeries.length - 1;
         }
-        return Infinity;
+        return track.tactics.grToGoalSeries[idx].distToGoal;
     };
     
     if (mode === 'currently') {
@@ -3663,7 +4320,12 @@ function applyTopNSelection() {
     // Update stats chart in real-time if panel is open
     const rightPanelEl = document.getElementById('right-panel');
     if (rightPanelEl && !rightPanelEl.classList.contains('collapsed')) {
-        updateStatsAnalysis();
+        const btnTabLeading = document.getElementById('btn-tab-leading');
+        if (btnTabLeading && btnTabLeading.classList.contains('active')) {
+            updateLeadingPointsChart();
+        } else {
+            updateStatsAnalysis();
+        }
     }
 }
 

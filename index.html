@@ -96,6 +96,8 @@
                                 <th>Dist <span class="unit">(km)</span></th>
                                 <th>GR</th>
                                 <th>GR to Goal</th>
+                                <th>Lead Pts</th>
+                                <th>Time Pts</th>
                             </tr>
                         </thead>
                         <tbody id="pilot-list">
@@ -171,58 +173,106 @@
             </div>
             
             <div class="right-panel-content">
-                <div class="panel-section">
-                    <h3>Compare with ESS Time</h3>
-                    <div class="control-row" style="display: flex; gap: 8px; margin-bottom: 12px;">
-                        <div style="flex: 1;">
-                            <label for="chart-x-select" style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-bottom: 4px;">X-Axis Statistic</label>
-                            <select id="chart-x-select" style="width: 100%; padding: 6px; border-radius: 4px; background: var(--bg-card); color: var(--text-main); border: 1px solid var(--border); font-size: 0.825rem;">
-                                <option value="fgDist">FG Dist (km)</option>
-                                <option value="fgGr" selected>FG GR</option>
-                                <option value="essAlt">ESS Alt AGL (ft)</option>
-                                <option value="essGr">ESS GR</option>
-                                <option value="maxSpeed">Max Speed (10s avg, km/h)</option>
-                            </select>
+                <!-- Stats Tabs -->
+                <div class="stats-tabs">
+                    <button id="btn-tab-correlation" class="btn-tab active">ESS Correlation</button>
+                    <button id="btn-tab-leading" class="btn-tab">Leading Points</button>
+                </div>
+
+                <!-- Tab 1: Correlation Content -->
+                <div id="stats-tab-correlation-content" style="display: flex; flex-direction: column; gap: 20px;">
+                    <div class="panel-section">
+                        <h3>Compare with ESS Time</h3>
+                        <div class="control-row" style="display: flex; gap: 8px; margin-bottom: 12px;">
+                            <div style="flex: 1;">
+                                <label for="chart-x-select" style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-bottom: 4px;">X-Axis Statistic</label>
+                                <select id="chart-x-select" style="width: 100%; padding: 6px; border-radius: 4px; background: var(--bg-card); color: var(--text-main); border: 1px solid var(--border); font-size: 0.825rem;">
+                                    <option value="fgDist">FG Dist (km)</option>
+                                    <option value="fgGr" selected>FG GR</option>
+                                    <option value="essAlt">ESS Alt AGL (ft)</option>
+                                    <option value="essGr">ESS GR</option>
+                                    <option value="maxSpeed">Max Speed (10s avg, km/h)</option>
+                                </select>
+                            </div>
+                            <div style="flex: 1;">
+                                <label for="chart-fit-select" style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-bottom: 4px;">Trendline Fit</label>
+                                <select id="chart-fit-select" style="width: 100%; padding: 6px; border-radius: 4px; background: var(--bg-card); color: var(--text-main); border: 1px solid var(--border); font-size: 0.825rem;">
+                                    <option value="linear">Linear Fit</option>
+                                    <option value="quadratic" selected>Quadratic Fit</option>
+                                    <option value="none">No Fit</option>
+                                </select>
+                            </div>
                         </div>
-                        <div style="flex: 1;">
-                            <label for="chart-fit-select" style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-bottom: 4px;">Trendline Fit</label>
-                            <select id="chart-fit-select" style="width: 100%; padding: 6px; border-radius: 4px; background: var(--bg-card); color: var(--text-main); border: 1px solid var(--border); font-size: 0.825rem;">
-                                <option value="linear">Linear Fit</option>
-                                <option value="quadratic" selected>Quadratic Fit</option>
-                                <option value="none">No Fit</option>
-                            </select>
-                        </div>
+                    </div>
+
+                    <div class="panel-section stats-summary-card">
+                        <div id="stats-correlation-coef" class="correlation-coef">r = --</div>
+                        <div id="stats-correlation-desc" class="correlation-desc">No data loaded</div>
+                    </div>
+
+                    <div class="panel-section chart-wrapper">
+                        <canvas id="stats-chart"></canvas>
+                    </div>
+
+                    <div class="panel-section optimal-insight-card hidden" id="optimal-insight-card">
+                        <h4>💡 Optimal Value Insight</h4>
+                        <p id="optimal-insight-text">Loading...</p>
+                    </div>
+
+                    <div class="panel-section correlations-list-section">
+                        <h3>Correlation Table (vs ESS Time)</h3>
+                        <table class="correlation-table">
+                            <thead>
+                                <tr>
+                                    <th>Statistic</th>
+                                    <th>Pearson r</th>
+                                    <th>Strength</th>
+                                </tr>
+                            </thead>
+                            <tbody id="correlations-table-body">
+                                <!-- Injected programmatically -->
+                            </tbody>
+                        </table>
                     </div>
                 </div>
 
-                <div class="panel-section stats-summary-card">
-                    <div id="stats-correlation-coef" class="correlation-coef">r = --</div>
-                    <div id="stats-correlation-desc" class="correlation-desc">No data loaded</div>
-                </div>
-
-                <div class="panel-section chart-wrapper">
-                    <canvas id="stats-chart"></canvas>
-                </div>
-
-                <div class="panel-section optimal-insight-card hidden" id="optimal-insight-card">
-                    <h4>💡 Optimal Value Insight</h4>
-                    <p id="optimal-insight-text">Loading...</p>
-                </div>
-
-                <div class="panel-section correlations-list-section">
-                    <h3>Correlation Table (vs ESS Time)</h3>
-                    <table class="correlation-table">
-                        <thead>
-                            <tr>
-                                <th>Statistic</th>
-                                <th>Pearson r</th>
-                                <th>Strength</th>
-                            </tr>
-                        </thead>
-                        <tbody id="correlations-table-body">
-                            <!-- Injected programmatically -->
-                        </tbody>
-                    </table>
+                <!-- Tab 2: Leading Points Content -->
+                <div id="stats-tab-leading-content" style="display: none; flex-direction: column; gap: 20px;">
+                    <div class="panel-section">
+                        <h3>Leading Points Accumulation</h3>
+                        <p style="font-size: 0.825rem; color: var(--text-muted); line-height: 1.4; margin-bottom: 12px;">
+                            Shows how leading points were accumulated by each pilot (Y-axis) relative to their distance flown along the speed section (X-axis).
+                        </p>
+                        <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 16px; margin-top: 10px;">
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <span style="font-size: 0.75rem; color: var(--text-muted); white-space: nowrap;">X-Axis Mode:</span>
+                                <div style="display: flex; gap: 12px; align-items: center;">
+                                    <label style="font-size: 0.75rem; color: var(--text-main); display: flex; align-items: center; gap: 4px; cursor: pointer;">
+                                        <input type="radio" name="lead-chart-xaxis" value="distance" checked style="margin: 0; vertical-align: middle;"> Distance
+                                    </label>
+                                    <label style="font-size: 0.75rem; color: var(--text-main); display: flex; align-items: center; gap: 4px; cursor: pointer;">
+                                        <input type="radio" name="lead-chart-xaxis" value="time" style="margin: 0; vertical-align: middle;"> Time
+                                    </label>
+                                </div>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 8px; flex: 1; min-width: 150px;">
+                                <label for="select-chart-resolution" style="font-size: 0.75rem; color: var(--text-muted); white-space: nowrap;">Resolution:</label>
+                                <select id="select-chart-resolution" style="flex: 1; padding: 6px; border-radius: 4px; background: var(--bg-card); color: var(--text-main); border: 1px solid var(--border); font-size: 0.8rem;">
+                                    <option value="50">50 m / 30 s</option>
+                                    <option value="100">100 m / 1 min</option>
+                                    <option value="250">250 m / 2.5 min</option>
+                                    <option value="500" selected>500 m / 5 min</option>
+                                    <option value="1000">1 km / 10 min</option>
+                                    <option value="2000">2 km / 20 min</option>
+                                    <option value="5000">5 km / 50 min</option>
+                                    <option value="10000">10 km / 100 min</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="panel-section chart-wrapper">
+                        <canvas id="lead-points-chart"></canvas>
+                    </div>
                 </div>
             </div>
         </aside>
@@ -341,6 +391,21 @@ Deadline: 	19:00:00</textarea>
                                 <span id="label-glide-slope-ratio" style="font-size: 0.75rem; font-family: monospace; color: var(--text-main);">10:1</span>
                             </div>
                             <input type="range" id="slide-glide-slope-ratio" min="1" max="15" value="10" step="1" style="width: 100%; height: 4px; border-radius: 2px; background: var(--border); cursor: pointer; accent-color: var(--primary);">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Coin Animations -->
+                <div class="settings-section">
+                    <h3>Coin Animations</h3>
+                    <label for="chk-coin-enable" style="font-size: 0.825rem; color: var(--text-main); cursor: pointer; display: flex; align-items: center; gap: 8px; user-select: none; margin-bottom: 10px;">
+                        <input type="checkbox" id="chk-coin-enable" style="width: 16px; height: 16px; margin: 0; cursor: pointer;">
+                        Enable Popups & Sound
+                    </label>
+                    <div id="coin-controls-wrapper" style="display: none; flex-direction: column; gap: 10px; border-top: 1px solid var(--border); padding-top: 10px;">
+                        <div>
+                            <label for="input-coin-interval" style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-bottom: 4px;">Coin Interval (Points)</label>
+                            <input type="number" id="input-coin-interval" min="0.1" step="0.1" value="3.0" style="width: 100%; padding: 6px; border-radius: 4px; background: var(--bg-card); color: var(--text-main); border: 1px solid var(--border); font-size: 0.8rem;">
                         </div>
                     </div>
                 </div>

@@ -7,3 +7,5 @@ No 	Leg Dist. 	Id 	Radius 	Open 	Close 	Coordinates 	Altitude
 6 	90.7 km 	WATERV 	4000 m 	13:25 	18:00 	Lat: 47.65573 Lon: -120.05957 	806 m
 7 ES 	102.6 km 	SOCCER 	2000 m 	13:25 	18:00 	Lat: 47.79867 Lon: -119.98503 	222 m
 8 	104.2 km 	SOCCER 	400 m 	13:25 	18:00 	Lat: 47.79867 Lon: -119.98503 	222 m
+Startgate: 	13:25:00
+Deadline: 	18:00:00

@@ -562,7 +562,7 @@ input[type=range]:disabled::-webkit-slider-thumb { background: var(--text-muted)
     justify-content: center;
     background:
         linear-gradient(to bottom, rgba(5, 10, 25, 0.35) 0%, rgba(5, 10, 25, 0.55) 100%),
-        url('DSC00276.JPG') center center / cover no-repeat;
+        url('PXL_20240905_014351886.jpg') center center / cover no-repeat;
     transition: opacity 0.6s ease;
 }
 .track-loader.hidden {
@@ -809,6 +809,37 @@ input[type=range]:disabled::-webkit-slider-thumb { background: var(--text-muted)
 
 .optimal-insight-card.hidden {
     display: none;
+}
+
+/* Stats Panel Tabs */
+.stats-tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 5px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 10px;
+}
+.btn-tab {
+    flex: 1;
+    padding: 8px 12px;
+    border-radius: var(--border-radius);
+    border: 1px solid var(--border);
+    background: var(--bg-card);
+    color: var(--text-muted);
+    font-size: 0.825rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+.btn-tab:hover {
+    color: var(--text-main);
+    border-color: var(--text-muted);
+}
+.btn-tab.active {
+    background: var(--accent);
+    color: #ffffff;
+    border-color: var(--accent);
+    box-shadow: 0 0 8px rgba(59, 130, 246, 0.4);
 }
 
 /* Chart Wrapper */
@@ -1170,7 +1201,29 @@ input[type=range]:disabled::-webkit-slider-thumb { background: var(--text-muted)
     background: var(--accent) !important;
     border-color: var(--accent) !important;
     color: #ffffff !important;
+}/* Coin Animation */
+@keyframes coinPop {
+    0% { transform: translateY(0) scale(0.5); opacity: 1; }
+    50% { transform: translateY(-40px) scale(1.2); opacity: 1; }
+    100% { transform: translateY(-60px) scale(1); opacity: 0; }
 }
 
-
-
+.coin-popup {
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    background: radial-gradient(circle, #ffd700 30%, #b8860b 80%);
+    border: 2px solid #daa520;
+    border-radius: 50%;
+    box-shadow: 0 0 10px rgba(255, 215, 0, 0.8), inset 0 0 5px rgba(255, 255, 255, 0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-size: 10px;
+    font-weight: bold;
+    text-shadow: 1px 1px 0 #000;
+    pointer-events: none;
+    z-index: 10000;
+    animation: coinPop 0.8s ease-out forwards;
+}
