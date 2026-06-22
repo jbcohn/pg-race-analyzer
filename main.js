@@ -2304,8 +2304,10 @@ function updatePlaybackState() {
         // Find current segment using binary search or linear scan
         const pts = track.points;
         if (state.currentTime <= pts[0].time) {
+            track.currentPosIndex = 0;
             updatePilotMarker(track, pts[0], null);
         } else if (state.currentTime >= pts[pts.length - 1].time) {
+            track.currentPosIndex = pts.length - 1;
             updatePilotMarker(track, pts[pts.length - 1], null);
         } else {
             // Simple linear scan (could optimize by storing currentPosIndex)
