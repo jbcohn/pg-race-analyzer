@@ -463,7 +463,10 @@ function initApp() {
     const chartYSelect = document.getElementById('chart-y-select');
     const chartXSelect = document.getElementById('chart-x-select');
     const chartFitSelect = document.getElementById('chart-fit-select');
-    if (chartYSelect) chartYSelect.addEventListener('change', updateStatsAnalysis);
+    if (chartYSelect) {
+        chartYSelect.value = 'score';
+        chartYSelect.addEventListener('change', updateStatsAnalysis);
+    }
     if (chartXSelect) chartXSelect.addEventListener('change', updateStatsAnalysis);
     if (chartFitSelect) chartFitSelect.addEventListener('change', updateStatsAnalysis);
     
