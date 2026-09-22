@@ -137,8 +137,10 @@ export function ensureTimestamps(points, explicitOffset = 'auto') {
     const hasUtc = points.some(p => p.utcTime !== undefined && !isNaN(p.utcTime));
     if (hasUtc) {
         const offset = getLocalOffsetHours(points, explicitOffset);
+        const startUtc = points[0].utcTime;
+        const baseLocalTime = ((startUtc + offset * 3600) % 86400 + 86400) % 86400;
         points.forEach(p => {
-            p.time = (p.utcTime + offset * 3600 + 86400 * 2) % 86400;
+            p.time = baseLocalTime + (p.utcTime - startUtc);
         });
         return points;
     }
@@ -200,9 +202,11 @@ export function ensureTimestamps(points, explicitOffset = 'auto') {
 
     // Assign monotonic utcTime reference and project to local solar time
     const offset = getLocalOffsetHours(points, explicitOffset);
+    const startUtc = points[0].time;
+    const baseLocalTime = ((startUtc + offset * 3600) % 86400 + 86400) % 86400;
     points.forEach(p => {
         p.utcTime = p.time;
-        p.time = (p.utcTime + offset * 3600 + 86400 * 2) % 86400;
+        p.time = baseLocalTime + (p.utcTime - startUtc);
     });
 
     return points;
