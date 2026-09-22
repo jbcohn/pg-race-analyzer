@@ -1,0 +1,9 @@
+Task Definition
+Name Type Radius Leg Dist. Coordinates with altitude
+T02 Takeoff 0.100 0.000 38.634250, -112.060280 @ 2671 m
+T02 SSS 4.000 4.000 38.634250, -112.060280 @ 2671 m
+S05 Cylinder 3.000 31.146 38.935570, -111.853930 @ 1604 m
+S01 Cylinder 9.000 43.778 39.195130, -111.692750 @ 1696 m
+A01 ESS 2.000 5.043 39.326620, -111.615930 @ 1672 m
+Startgate: 14:45:00
+Deadline: 19:30:00

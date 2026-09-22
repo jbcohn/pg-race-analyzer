@@ -1292,8 +1292,14 @@ function drawTask() {
         // If no turnpoint was explicitly typed as 'goal' (e.g. tabular format files
         // where the last row has no keyword), promote the last turnpoint to goal.
         const hasGoal = state.task.some(t => t.type === 'goal');
-        if (!hasGoal) {
-            state.task[state.task.length - 1].type = 'goal';
+        if (!hasGoal && state.task.length > 0) {
+            const lastTP = state.task[state.task.length - 1];
+            if (lastTP.type === 'es') {
+                // If the task ends at ESS, ESS and Goal coincide
+                state.task.push({ ...lastTP, type: 'goal' });
+            } else {
+                lastTP.type = 'goal';
+            }
         }
 
         state.map.invalidateSize();
