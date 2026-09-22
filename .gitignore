@@ -4,3 +4,5 @@ node_modules/
 dist/
 .idea/
 .vscode/
+*.zip
+*.code-workspace

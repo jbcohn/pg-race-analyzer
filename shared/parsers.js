@@ -121,6 +121,10 @@ function getLocalOffsetHours(points, explicitOffset = 'auto') {
         if (lng >= -125 && lng <= -114) {
             return -7;
         }
+        // Mountain Time Zone (MST -7, MDT -6). Default to MDT for summer paragliding flying season.
+        if (lng > -114 && lng <= -104) {
+            return -6;
+        }
         return Math.round(lng / 15);
     }
     return 0;

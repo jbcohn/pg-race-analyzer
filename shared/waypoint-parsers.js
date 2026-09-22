@@ -122,50 +122,67 @@ export function parseTaskCoordinates(text) {
         const line = lines[i].trim();
         if (!line) continue;
         
-        // Recreate the regex each iteration to avoid stale lastIndex from the g flag
+        let lat = NaN;
+        let lng = NaN;
+        let elev = 0;
+        let id = null;
+
+        // Pattern 1: Lat: XX.XXXX Lon: YY.YYYY
         const coordPattern = /Lat:\s*([-\d.]+)\s+Lon:\s*([-\d.]+)/i;
         const coordMatch = coordPattern.exec(line);
         if (coordMatch) {
-            const lat = parseFloat(coordMatch[1]);
-            const lng = parseFloat(coordMatch[2]);
+            lat = parseFloat(coordMatch[1]);
+            lng = parseFloat(coordMatch[2]);
             
-            if (!isNaN(lat) && !isNaN(lng)) {
-                // Extract the waypoint ID from the portion of the line before the coordinates
-                let lineBefore = line.substring(0, coordMatch.index);
-                
-                // Split by tabs or multiple spaces
-                const parts = lineBefore.split(/\t+|\s{2,}/);
-                let id = null;
-                
-                // Find a non-numeric identifier. In the tabular format:
-                //   "No \t Leg Dist \t Id \t Radius \t ... \t Coordinates"
-                // the ID is at index 2.
-                if (parts.length >= 3) {
-                    const candidate = parts[2].replace(/[^\w-]/g, '').trim();
-                    if (candidate && !candidate.match(/^\d+(\.\d+)?$/)) {
-                        id = candidate;
-                    }
-                }
-                
-                // Fallback: look for any uppercase identifier in lineBefore
-                if (!id) {
-                    const matches = lineBefore.match(/[A-Z]{2,}[A-Z0-9]*/);
-                    if (matches) {
-                        id = matches[0];
-                    }
-                }
-                
-                // Extract elevation (look for number followed by 'm' immediately before "Lat:")
-                let elev = 0;
-                const elevMatch = line.match(/(\d+)\s*m\s+Lat:/);
-                if (elevMatch) {
-                    elev = parseInt(elevMatch[1], 10);
-                }
-                
-                if (id) {
-                    waypoints[id] = { lat, lng, elev, name: id };
+            // Extract the waypoint ID from the portion of the line before the coordinates
+            let lineBefore = line.substring(0, coordMatch.index);
+            
+            // Split by tabs or multiple spaces
+            const parts = lineBefore.split(/\t+|\s{2,}/);
+            
+            // Find a non-numeric identifier. In the tabular format:
+            //   "No \t Leg Dist \t Id \t Radius \t ... \t Coordinates"
+            // the ID is at index 2.
+            if (parts.length >= 3) {
+                const candidate = parts[2].replace(/[^\w-]/g, '').trim();
+                if (candidate && !candidate.match(/^\d+(\.\d+)?$/)) {
+                    id = candidate;
                 }
             }
+            
+            // Fallback: look for any uppercase identifier in lineBefore
+            if (!id) {
+                const matches = lineBefore.match(/[A-Z]{2,}[A-Z0-9]*/);
+                if (matches) {
+                    id = matches[0];
+                }
+            }
+            
+            // Extract elevation (look for number followed by 'm' immediately before "Lat:")
+            const elevMatch = line.match(/(\d+)\s*m\s+Lat:/);
+            if (elevMatch) {
+                elev = parseInt(elevMatch[1], 10);
+            }
+        } else {
+            // Pattern 2: lat, lng [ @ elev m ] e.g. 38.540820, -112.073520 @ 3403 m
+            const commaPattern = /([-\d.]+),\s*([-\d.]+)(?:\s*@\s*(\d+(?:\.\d+)?)\s*m)?/;
+            const commaMatch = commaPattern.exec(line);
+            if (commaMatch) {
+                lat = parseFloat(commaMatch[1]);
+                lng = parseFloat(commaMatch[2]);
+                if (commaMatch[3]) {
+                    elev = parseFloat(commaMatch[3]);
+                }
+                const lineBefore = line.substring(0, commaMatch.index).trim();
+                const parts = lineBefore.split(/\s+/);
+                if (parts.length > 0 && parts[0].toLowerCase() !== 'name') {
+                    id = parts[0].replace(/[^\w-]/g, '').trim();
+                }
+            }
+        }
+
+        if (!isNaN(lat) && !isNaN(lng) && id) {
+            waypoints[id] = { lat, lng, elev, name: id };
         }
     }
     

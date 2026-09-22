@@ -1,0 +1,16 @@
+Task 2
+2026-06-22
+Race 106.8 Km
+Official Result
+id 		Radius 	Dist. 	Description
+LAUNCH 	launch 	400 m   		LAUNCH
+LAUNCH 	SS 	3.0 Km 	3.00 Km 	LAUNCH
+WATERV 		7.0 Km 	13.97 Km 	WATERV
+CASHLZ 		7.0 Km 	38.69 Km 	CASHLZ
+WATERV 		7.0 Km 	62.78 Km 	WATERV
+SAGE23 		19.0 Km 	77.37 Km 	SAGE23
+WATERV 		7.0 Km 	92.50 Km 	WATERV
+SOCCER 	ES 	2.0 Km 	104.80 Km 	SOCCER
+SOCCER 	goal 	100 m   	106.80 Km 	SOCCER
+Startgate: 	12:00:00
+Deadline: 	17:00:00

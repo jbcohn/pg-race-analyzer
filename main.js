@@ -508,10 +508,21 @@ function initApp() {
     initLiftSinkControls();
 }
 
-async function loadOverallStandingsForTask(taskId) {
-    let standingsFile = 'Tasks/USOP 2025 Chelan overall_standings.txt'; // default to 2025
-    if (taskId && taskId.includes('2023')) {
-        standingsFile = 'Tasks/USOP 2023 Chelan overall_standings.txt';
+async function loadOverallStandingsForTask(taskId, customPath) {
+    let standingsFile = customPath || null;
+    if (!customPath && taskId && taskId.includes('Chelan')) {
+        if (taskId.includes('2023')) {
+            standingsFile = 'Tasks/USOP 2023 Chelan overall_standings.txt';
+        } else if (taskId.includes('2025')) {
+            standingsFile = 'Tasks/USOP 2025 Chelan overall_standings.txt';
+        } else if (taskId.includes('2026')) {
+            standingsFile = 'Tasks/USOP 2026 Chelan overall_standings.txt';
+        }
+    }
+    
+    if (!standingsFile) {
+        state.overallStandings = {};
+        return;
     }
     
     try {
@@ -573,6 +584,7 @@ function setupPredefinedTasks() {
                 if (!taskInfo) return;
                 
                 state.activeTaskName = taskInfo.name;
+                state.taskTimezoneOffset = taskInfo.timezone_offset !== undefined ? taskInfo.timezone_offset : 'auto';
                 const taskTitleEl = document.getElementById('active-task-title');
                 if (taskTitleEl) {
                     taskTitleEl.textContent = taskInfo.name;
@@ -602,7 +614,7 @@ function setupPredefinedTasks() {
                     }
 
                     // Load corresponding overall standings
-                    await loadOverallStandingsForTask(taskInfo.id);
+                    await loadOverallStandingsForTask(taskInfo.id, taskInfo.overall_standings);
                     
                     // Remove all track layers from the map
                     state.tracks.forEach(t => {
@@ -691,11 +703,12 @@ function setupPredefinedTasks() {
                     updatePilotListUI();
                     
                     // 1. Load waypoints
-                    if (manifest.waypoint_file) {
+                    const wptFile = taskInfo.waypoint_file || manifest.waypoint_file;
+                    if (wptFile) {
                         if (loaderTextEl) loaderTextEl.textContent = 'Loading waypoints...';
-                        const wptRes = await fetch(`${encodePath(manifest.waypoint_file)}?t=${Date.now()}`);
+                        const wptRes = await fetch(`${encodePath(wptFile)}?t=${Date.now()}`);
                         const wptText = await wptRes.text();
-                        const newWpts = parseWaypointFile(wptText, "us-open-paragliding-2025.FS(1).wpt");
+                        const newWpts = parseWaypointFile(wptText, wptFile);
                         Object.assign(state.waypoints, newWpts);
                         try { localStorage.setItem('pg-waypoints', JSON.stringify(state.waypoints)); } catch(err) {}
                     }
@@ -728,7 +741,7 @@ function setupPredefinedTasks() {
                         if (!trackPoints || trackPoints.length === 0) return;
                         
                         // Add track to state
-                        const points = ensureTimestamps(trackPoints);
+                        const points = ensureTimestamps(trackPoints, state.taskTimezoneOffset !== undefined ? state.taskTimezoneOffset : 'auto');
                         addTrackToState(filename, points);
                         
                         loadedCount++;
@@ -1103,7 +1116,7 @@ function drawTask() {
 
     for (let line of lines) {
         line = line.trim();
-        if (!line || line.startsWith('id') || line.startsWith('Radius')) continue;
+        if (!line || line.startsWith('id') || line.startsWith('Radius') || line.toLowerCase().startsWith('name')) continue;
         
         const startgateMatch = line.match(/^startgate\s*:\s*(\d{1,2}):(\d{2})(?::(\d{2}))?/i);
         if (startgateMatch) {
@@ -1126,11 +1139,26 @@ function drawTask() {
         }
 
         const parts = line.split(/\t+|\s{2,}/);
-        if (parts.length < 2) continue;
+        if (parts.length < 2 && !line.match(/^(\S+)\s+(.+?)\s+([\d.]+)\s+([\d.]+)/)) continue;
 
         let id, type, radius = 0, dist = 0;
 
-        if (colMap && colMap.idIdx !== -1 && parts.length > colMap.idIdx) {
+        const spaceFormatMatch = line.match(/^(\S+)\s+(.+?)\s+([\d.]+)\s+([\d.]+)(?:\s+([-\d.]+,\s*[-\d.]+.*))?$/);
+        if (spaceFormatMatch && !line.toLowerCase().startsWith('name')) {
+            id = spaceFormatMatch[1].replace(/[^\w-]/g, '').trim();
+            const rawType = spaceFormatMatch[2].toLowerCase();
+            type = 'turnpoint';
+            if (rawType.includes('takeoff') || rawType.includes('launch')) type = 'launch';
+            else if (rawType.includes('sss') || rawType === 'ss') type = 'ss';
+            else if (rawType.includes('ess') || rawType === 'es') type = 'es';
+            else if (rawType.includes('goal')) type = 'goal';
+            
+            let rVal = parseFloat(spaceFormatMatch[3]);
+            radius = (rVal < 100) ? rVal * 1000 : rVal;
+            
+            let dVal = parseFloat(spaceFormatMatch[4]);
+            dist = (dVal < 500) ? dVal * 1000 : dVal;
+        } else if (colMap && colMap.idIdx !== -1 && parts.length > colMap.idIdx) {
             // --- Tabular format: use header-derived column indices ---
             // Skip the header row itself
             const firstCell = parts[0].toLowerCase().replace(/[.\s]/g, '');
@@ -1790,7 +1818,7 @@ async function handleFileUpload(e) {
             }
 
             if (rawPoints && rawPoints.length > 0) {
-                const points = ensureTimestamps(rawPoints);
+                const points = ensureTimestamps(rawPoints, state.taskTimezoneOffset !== undefined ? state.taskTimezoneOffset : 'auto');
                 addTrackToState(name, points);
                 successfulCount++;
             }
@@ -1813,7 +1841,7 @@ async function handleFileUpload(e) {
 }
 
 function addTrackToState(rawName, points, terrainProfile = null) {
-    ensureTimestamps(points);
+    ensureTimestamps(points, state.taskTimezoneOffset !== undefined ? state.taskTimezoneOffset : 'auto');
     const name = formatPilotName(rawName);
     const fullName = getPilotFullName(rawName);
     const initials = getPilotInitials(rawName);

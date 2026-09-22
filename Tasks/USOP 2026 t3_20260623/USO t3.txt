@@ -1,0 +1,15 @@
+Task 3
+2026-06-23
+Race 87.15 Km
+Official Result
+id 		Radius 	Dist. 	Description
+LAUNCH 	launch 	400 m   		LAUNCH
+LAUNCH 	SS 	3.0 Km 	3.00 Km 	LAUNCH
+STRMMT 		5.0 Km 	20.77 Km 	STRMMT
+WATERV 		4.0 Km 	48.14 Km 	WATERV
+H17210 		2.0 Km 	65.35 Km 	H17210
+ARDNVR 		24.0 Km 	81.44 Km 	ARDNVR
+SOCCER 	ES 	2.0 Km 	85.15 Km 	SOCCER
+SOCCER 	goal 	100 m   	87.15 Km 	SOCCER
+Startgate: 	12:00:00
+Deadline: 	17:00:00

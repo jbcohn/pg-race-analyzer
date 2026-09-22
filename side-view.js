@@ -198,7 +198,28 @@ export class SideView {
         const totalTaskDist = optTask ? optTask.totalDist : calculateRemainingLegs(state.task, 0, endGoalIdx);
         const goalTP = state.task[endGoalIdx];
         const goalRadiusKm = (goalTP.radius || 0) / 1000;
-        const maxScaleDist = totalTaskDist + goalRadiusKm;
+        let maxScaleDist = totalTaskDist + goalRadiusKm;
+
+        // If no pilot got close to goal, zoom the X-axis to the max distance actually flown
+        // so the side view doesn't show a mostly empty task on difficult/unfinished days.
+        {
+            let maxDistFlown = 0;
+            let anyGoalCrossed = false;
+            state.tracks.forEach(track => {
+                if (track.visible === false || !track.tactics || !track.tactics.grToGoalSeries) return;
+                const series = track.tactics.grToGoalSeries;
+                for (const s of series) {
+                    const df = s.distFlown !== undefined ? s.distFlown : Math.max(0, totalTaskDist - s.distToGoal);
+                    if (df > maxDistFlown) maxDistFlown = df;
+                    if (df >= totalTaskDist) anyGoalCrossed = true;
+                }
+            });
+            // Only shrink the scale if no pilot crossed goal and the max flown is
+            // less than 75% of the task distance (clearly a short day).
+            if (!anyGoalCrossed && maxDistFlown > 0 && maxDistFlown < totalTaskDist * 0.75) {
+                maxScaleDist = Math.min(maxScaleDist, maxDistFlown * 1.10 + goalRadiusKm);
+            }
+        }
 
         // Compute altitude bounds from terrain profile (or task elevations) AND pilot tracks
         let minAltFt = Infinity;
