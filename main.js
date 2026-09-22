@@ -3209,10 +3209,14 @@ function getXValue(track, type) {
         return (track.tactics.ssCrossTime - state.startGateTime) / 60.0;
     }
     if (type === 'fgDist') {
+        const gr = track.tactics.finalGlideGrToGoal;
+        if (gr === null || gr === undefined || gr <= 0 || gr > 20.0) return null;
         return track.tactics.finalGlideDistToGoal;
     }
     if (type === 'fgGr') {
-        return track.tactics.finalGlideGrToGoal;
+        const gr = track.tactics.finalGlideGrToGoal;
+        if (gr === null || gr === undefined || gr <= 0 || gr > 20.0) return null;
+        return gr;
     }
     if (type === 'essAlt') {
         if (track.tactics.essCrossTime === null || track.tactics.essCrossAlt === null) return null;

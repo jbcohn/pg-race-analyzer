@@ -719,11 +719,19 @@ export function analyzeTactics(points, task, startGateTime = null) {
             finalGlideIdx = Math.min(searchEndIdx, lastCircleIdx + 1);
         }
 
-        const p = points[finalGlideIdx];
-        metrics.finalGlideStartTime = p.time;
-        metrics.finalGlideStartAlt = p.alt;
-        metrics.finalGlideDistToGoal = metrics.grToGoalSeries[finalGlideIdx].distToGoal;
-        metrics.finalGlideGrToGoal = metrics.grToGoalSeries[finalGlideIdx].gr;
+        const rawGr = metrics.grToGoalSeries[finalGlideIdx].gr;
+        if (rawGr > 0 && rawGr <= 20.0) {
+            const p = points[finalGlideIdx];
+            metrics.finalGlideStartTime = p.time;
+            metrics.finalGlideStartAlt = p.alt;
+            metrics.finalGlideDistToGoal = metrics.grToGoalSeries[finalGlideIdx].distToGoal;
+            metrics.finalGlideGrToGoal = rawGr;
+        } else {
+            metrics.finalGlideStartTime = null;
+            metrics.finalGlideStartAlt = null;
+            metrics.finalGlideDistToGoal = null;
+            metrics.finalGlideGrToGoal = null;
+        }
     }
 
     // Find last crossing of start cylinder (index 1)
