@@ -234,4 +234,125 @@ export function calculateTimePoints(tracks, availableTimePoints, currentTime = I
 
         track.timePoints = parseFloat((speedFraction * availableTimePoints).toFixed(1));
     }
+
+    // 3. Compute finalTimePoints statically if not already done or if currentTime is Infinity
+    let needsFinalTime = false;
+    for (const track of tracks) {
+        if (track.visible !== false && track.tactics && track.tactics.finalTimePoints === undefined) {
+            needsFinalTime = true;
+            break;
+        }
+    }
+
+    if (needsFinalTime || currentTime === Infinity) {
+        let staticBestTime = Infinity;
+        let staticGoalCount = 0;
+        for (const track of tracks) {
+            if (track.visible === false || !track.tactics) continue;
+            const ssTimeSec = track.tactics.speedSectionTime;
+            if (ssTimeSec && ssTimeSec > 0) {
+                const ssTimeHours = ssTimeSec / 3600.0;
+                let reachedGoal = false;
+                if (track.tactics.goalCrossTime) {
+                    reachedGoal = true;
+                } else if (track.tactics.grToGoalSeries && track.tactics.grToGoalSeries.length > 0) {
+                    const lastIdx = track.tactics.grToGoalSeries.length - 1;
+                    const finalDist = track.tactics.grToGoalSeries[lastIdx].distToGoal;
+                    if (finalDist !== undefined && finalDist <= 0.0) reachedGoal = true;
+                } else if (track.tactics.speedSectionTime !== null) {
+                    reachedGoal = true;
+                }
+                if (reachedGoal) {
+                    staticGoalCount++;
+                    if (ssTimeHours < staticBestTime) staticBestTime = ssTimeHours;
+                }
+            }
+        }
+
+        for (const track of tracks) {
+            if (track.visible === false || !track.tactics) {
+                if (track.tactics) track.tactics.finalTimePoints = 0.0;
+                continue;
+            }
+            const ssTimeSec = track.tactics.speedSectionTime;
+            if (!ssTimeSec || ssTimeSec <= 0 || staticGoalCount === 0 || staticBestTime === Infinity) {
+                track.tactics.finalTimePoints = 0.0;
+                continue;
+            }
+            const pilotTimeHours = ssTimeSec / 3600.0;
+            const timeDiff = pilotTimeHours - staticBestTime;
+            const rootBest = Math.sqrt(staticBestTime);
+            let speedFraction = 0.0;
+            if (timeDiff < rootBest) {
+                const ratio = timeDiff / rootBest;
+                speedFraction = Math.max(0.0, 1.0 - Math.pow(ratio, 5.0 / 6.0));
+            }
+            track.tactics.finalTimePoints = parseFloat((speedFraction * availableTimePoints).toFixed(1));
+        }
+    }
+}
+
+export function calculateDistancePoints(tracks, availableDistancePoints = 634.65, totalTaskDist = 0, currentTime = Infinity) {
+    if (!tracks || tracks.length === 0) return;
+
+    // 1. Determine benchmark maximum distance
+    let maxDistFlown = (totalTaskDist && totalTaskDist > 0) ? totalTaskDist : 0;
+    for (const track of tracks) {
+        if (track.visible === false || !track.tactics) continue;
+        const d = track.tactics.maxDistFlown || 0;
+        if (d > maxDistFlown) maxDistFlown = d;
+    }
+
+    if (maxDistFlown <= 0) {
+        for (const track of tracks) {
+            track.distancePoints = 0.0;
+            if (track.tactics) {
+                track.tactics.finalDistancePoints = 0.0;
+                track.tactics.finalScore = parseFloat(((track.tactics.finalTimePoints || 0) + (track.tactics.finalLeadingPoints || 0)).toFixed(1));
+            }
+            track.totalScore = parseFloat(((track.timePoints || 0) + (track.leadingPoints || 0)).toFixed(1));
+        }
+        return;
+    }
+
+    // 2. Allocate distance points and calculate total scores
+    for (const track of tracks) {
+        if (track.visible === false || !track.tactics) {
+            track.distancePoints = 0.0;
+            if (track.tactics) {
+                track.tactics.finalDistancePoints = 0.0;
+                track.tactics.finalScore = 0.0;
+            }
+            track.totalScore = 0.0;
+            continue;
+        }
+
+        // Final distance points
+        const finalDist = track.tactics.maxDistFlown !== undefined ? track.tactics.maxDistFlown : 0;
+        const finalRatio = Math.min(1.0, Math.max(0.0, finalDist / maxDistFlown));
+        const finalDistPts = parseFloat((finalRatio * availableDistancePoints).toFixed(1));
+        track.tactics.finalDistancePoints = finalDistPts;
+
+        // Current distance points during playback
+        let currentDist = finalDist;
+        if (currentTime !== Infinity && track.tactics.grToGoalSeries && track.tactics.grToGoalSeries.length > 0) {
+            const series = track.tactics.grToGoalSeries;
+            let curMax = 0;
+            for (let i = 0; i < series.length; i++) {
+                if (series[i].time <= currentTime) {
+                    if (series[i].distFlown > curMax) curMax = series[i].distFlown;
+                } else {
+                    break;
+                }
+            }
+            currentDist = curMax;
+        }
+
+        const currentRatio = Math.min(1.0, Math.max(0.0, currentDist / maxDistFlown));
+        track.distancePoints = parseFloat((currentRatio * availableDistancePoints).toFixed(1));
+
+        // Total score calculation
+        track.totalScore = parseFloat(((track.distancePoints || 0) + (track.timePoints || 0) + (track.leadingPoints || 0)).toFixed(1));
+        track.tactics.finalScore = parseFloat(((track.tactics.finalDistancePoints || 0) + (track.tactics.finalTimePoints || 0) + (track.tactics.finalLeadingPoints || 0)).toFixed(1));
+    }
 }

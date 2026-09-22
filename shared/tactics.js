@@ -542,6 +542,7 @@ export function analyzeTactics(points, task, startGateTime = null) {
     let lastDistFromTToGoal = 0;
     let lastTargetIndex = -1;
     let lastOptimizedTime = null;
+    let maxDistFlown = 0;
 
     if (hasTask) {
         for (let i = 0; i < raceEndIdx; i++) {
@@ -623,6 +624,10 @@ export function analyzeTactics(points, task, startGateTime = null) {
                 distFlown = Math.max(0, totalTaskDist - totalDistToGoal);
             }
 
+            if (distFlown > maxDistFlown) {
+                maxDistFlown = distFlown;
+            }
+
             metrics.grToGoalSeries.push({ time: p.time, gr: grGoal, distToGoal: totalDistToGoal, distFlown: distFlown, targetIndex: targetIndex });
 
             // Calculate GR to ESS if it exists
@@ -640,6 +645,12 @@ export function analyzeTactics(points, task, startGateTime = null) {
             }
 
         }
+
+        if (goalCrossIdx !== -1) {
+            maxDistFlown = totalTaskDist;
+        }
+        metrics.maxDistFlown = maxDistFlown;
+        metrics.totalTaskDist = totalTaskDist;
     }
 
     // 2. ESS Crossing Analysis

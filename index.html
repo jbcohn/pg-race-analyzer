@@ -175,31 +175,42 @@
             <div class="right-panel-content">
                 <!-- Stats Tabs -->
                 <div class="stats-tabs">
-                    <button id="btn-tab-correlation" class="btn-tab active">ESS Correlation</button>
+                    <button id="btn-tab-correlation" class="btn-tab active">Performance Correlation</button>
                     <button id="btn-tab-leading" class="btn-tab">Leading Points</button>
                 </div>
 
                 <!-- Tab 1: Correlation Content -->
                 <div id="stats-tab-correlation-content" style="display: flex; flex-direction: column; gap: 20px;">
                     <div class="panel-section">
-                        <h3>Compare with ESS Time</h3>
-                        <div class="control-row" style="display: flex; gap: 8px; margin-bottom: 12px;">
-                            <div style="flex: 1;">
-                                <label for="chart-x-select" style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-bottom: 4px;">X-Axis Statistic</label>
-                                <select id="chart-x-select" style="width: 100%; padding: 6px; border-radius: 4px; background: var(--bg-card); color: var(--text-main); border: 1px solid var(--border); font-size: 0.825rem;">
-                                    <option value="fgDist">FG Dist (km)</option>
-                                    <option value="fgGr" selected>FG GR</option>
-                                    <option value="essAlt">ESS Alt AGL (ft)</option>
-                                    <option value="essGr">ESS GR</option>
-                                    <option value="maxSpeed">Max Speed (10s avg, km/h)</option>
-                                </select>
+                        <h3 id="correlation-section-title">Performance Correlation</h3>
+                        <div class="control-row" style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px;">
+                            <div style="display: flex; gap: 8px;">
+                                <div style="flex: 1;">
+                                    <label for="chart-y-select" style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-bottom: 4px;">Dependent Variable (Y-Axis)</label>
+                                    <select id="chart-y-select" style="width: 100%; padding: 6px; border-radius: 4px; background: var(--bg-card); color: var(--text-main); border: 1px solid var(--border); font-size: 0.825rem;">
+                                        <option value="score" selected>Task Score (GAP Points) [All Pilots]</option>
+                                        <option value="speedSectionTime">Speed Section Time [Goal Finishers]</option>
+                                    </select>
+                                </div>
+                                <div style="flex: 1;">
+                                    <label for="chart-fit-select" style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-bottom: 4px;">Trendline Fit</label>
+                                    <select id="chart-fit-select" style="width: 100%; padding: 6px; border-radius: 4px; background: var(--bg-card); color: var(--text-main); border: 1px solid var(--border); font-size: 0.825rem;">
+                                        <option value="linear">Linear Fit</option>
+                                        <option value="quadratic" selected>Quadratic Fit</option>
+                                        <option value="none">No Fit</option>
+                                    </select>
+                                </div>
                             </div>
-                            <div style="flex: 1;">
-                                <label for="chart-fit-select" style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-bottom: 4px;">Trendline Fit</label>
-                                <select id="chart-fit-select" style="width: 100%; padding: 6px; border-radius: 4px; background: var(--bg-card); color: var(--text-main); border: 1px solid var(--border); font-size: 0.825rem;">
-                                    <option value="linear">Linear Fit</option>
-                                    <option value="quadratic" selected>Quadratic Fit</option>
-                                    <option value="none">No Fit</option>
+                            <div>
+                                <label for="chart-x-select" style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-bottom: 4px;">Independent Variable (X-Axis)</label>
+                                <select id="chart-x-select" style="width: 100%; padding: 6px; border-radius: 4px; background: var(--bg-card); color: var(--text-main); border: 1px solid var(--border); font-size: 0.825rem;">
+                                    <option value="distFlown" selected>Distance Flown (km) [All Pilots]</option>
+                                    <option value="maxSpeed">Max Speed (10s avg, km/h) [All Pilots]</option>
+                                    <option value="startDelay">Start Gate Delay (min) [All Pilots]</option>
+                                    <option value="fgDist">FG Dist (km) [Goal Finishers]</option>
+                                    <option value="fgGr">FG GR [Goal Finishers]</option>
+                                    <option value="essAlt">ESS Alt AGL (ft) [Goal Finishers]</option>
+                                    <option value="essGr">ESS GR [Goal Finishers]</option>
                                 </select>
                             </div>
                         </div>
@@ -220,7 +231,7 @@
                     </div>
 
                     <div class="panel-section correlations-list-section">
-                        <h3>Correlation Table (vs ESS Time)</h3>
+                        <h3 id="correlation-table-title">Correlation Table (vs Task Score)</h3>
                         <table class="correlation-table">
                             <thead>
                                 <tr>

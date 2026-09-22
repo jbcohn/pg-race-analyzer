@@ -2,7 +2,7 @@ import { parseIGC, parseGPX, parseKML, ensureTimestamps } from './shared/parsers
 import { haversineDistance, bearing } from './shared/geo-math.js';
 import { parseWaypointFile, parseTaskCoordinates } from './shared/waypoint-parsers.js';
 import { analyzeTactics, calculateRemainingLegs, getOptimizedTaskDistances } from './shared/tactics.js';
-import { calculateLeadingPoints, calculateTimePoints, integratePgWeightCurve } from './shared/scoring.js';
+import { calculateLeadingPoints, calculateTimePoints, calculateDistancePoints, integratePgWeightCurve } from './shared/scoring.js';
 import { initAudio, playCoinSound } from './shared/audio.js';
 import { SideView } from './side-view.js';
 
@@ -460,8 +460,10 @@ function initApp() {
         }
     });
     
+    const chartYSelect = document.getElementById('chart-y-select');
     const chartXSelect = document.getElementById('chart-x-select');
     const chartFitSelect = document.getElementById('chart-fit-select');
+    if (chartYSelect) chartYSelect.addEventListener('change', updateStatsAnalysis);
     if (chartXSelect) chartXSelect.addEventListener('change', updateStatsAnalysis);
     if (chartFitSelect) chartFitSelect.addEventListener('change', updateStatsAnalysis);
     
@@ -2183,6 +2185,10 @@ function updatePilotListUI() {
             <td class="stat-value" id="timepts-${track.id}">${timePtsStr}</td>
         `;
         
+        const distFlownStr = (track.tactics && track.tactics.maxDistFlown !== undefined) ? track.tactics.maxDistFlown.toFixed(1) : '--';
+        const scoreVal = (track.tactics && track.tactics.finalScore !== undefined) ? track.tactics.finalScore : track.totalScore;
+        const scoreStr = (scoreVal !== undefined && scoreVal !== null) ? scoreVal.toFixed(1) : '--';
+
         // Collapsed Details Row
         const detailsRow = document.createElement('tr');
         detailsRow.className = 'pilot-details-row';
@@ -2191,6 +2197,8 @@ function updatePilotListUI() {
         detailsRow.innerHTML = `
             <td colspan="8">
                 <div class="pilot-details-content">
+                    <div class="detail-item"><strong>Dist Flown:</strong> <span>${distFlownStr} km</span></div>
+                    <div class="detail-item"><strong>Task Score:</strong> <span>${scoreStr} pts</span></div>
                     <div class="detail-item"><strong>FG Dist:</strong> <span>${fgDistStr} km</span></div>
                     <div class="detail-item"><strong>FG GR:</strong> <span>${fgGrStr}</span></div>
                     <div class="detail-item"><strong>ESS Alt AGL:</strong> <span>${essAltStr} ft</span></div>
@@ -2386,6 +2394,7 @@ function updateRealTimeScores() {
     lastScoreUpdatePerf = now;
 
     let speedSectionDist = 0;
+    let totalTaskDist = 0;
     let minSSCrossTime = Infinity;
     let lastOutlandingTime = 0;
     let lastEssTime = 0;
@@ -2394,6 +2403,9 @@ function updateRealTimeScores() {
         if (t.tactics) {
             if (t.tactics.speedSectionDist > speedSectionDist) {
                 speedSectionDist = t.tactics.speedSectionDist;
+            }
+            if (t.tactics.totalTaskDist > totalTaskDist) {
+                totalTaskDist = t.tactics.totalTaskDist;
             }
             if (t.tactics.essCrossTime) {
                 if (t.tactics.essCrossTime > lastEssTime) lastEssTime = t.tactics.essCrossTime;
@@ -2406,6 +2418,11 @@ function updateRealTimeScores() {
             }
         }
     });
+
+    if (totalTaskDist === 0 && state.task && state.task.length > 0) {
+        const optTask = getOptimizedTaskDistances(state.task);
+        if (optTask) totalTaskDist = optTask.totalDist;
+    }
 
     const firstStartTime = state.startGateTime !== null ? state.startGateTime : (minSSCrossTime !== Infinity ? minSSCrossTime : 0);
 
@@ -2424,6 +2441,9 @@ function updateRealTimeScores() {
     // In GAP, time points are given if they reached ESS, which implies playback reached their ESS time.
     calculateTimePoints(state.tracks, 202.85, state.currentTime);
 
+    // Calculate Distance Points and Total Score for all pilots (including outlanded pilots)
+    calculateDistancePoints(state.tracks, 634.65, totalTaskDist, state.currentTime);
+
     state.tracks.forEach(track => {
         const leadPtsEl = document.getElementById(`leadpts-${track.id}`);
         if (leadPtsEl) {
@@ -2435,6 +2455,12 @@ function updateRealTimeScores() {
         if (timePtsEl) {
             const timePtsStr = (track.timePoints !== undefined && track.timePoints !== null) ? track.timePoints.toFixed(1) : '--';
             timePtsEl.textContent = timePtsStr;
+        }
+
+        const scoreEl = document.getElementById(`score-${track.id}`);
+        if (scoreEl) {
+            const scoreStr = (track.totalScore !== undefined && track.totalScore !== null) ? track.totalScore.toFixed(1) : '--';
+            scoreEl.textContent = scoreStr;
         }
         
         if (track.leadingPoints !== undefined && track.leadingPoints !== null) {
@@ -3163,6 +3189,16 @@ let leadPointsChart = null;
 
 function getXValue(track, type) {
     if (!track.tactics) return null;
+    if (type === 'distFlown') {
+        return track.tactics.maxDistFlown !== undefined ? track.tactics.maxDistFlown : null;
+    }
+    if (type === 'maxSpeed') {
+        return track.tactics.maxSpeed10Sec !== undefined ? track.tactics.maxSpeed10Sec : null;
+    }
+    if (type === 'startDelay') {
+        if (state.startGateTime === null || track.tactics.ssCrossTime === null) return null;
+        return (track.tactics.ssCrossTime - state.startGateTime) / 60.0;
+    }
     if (type === 'fgDist') {
         return track.tactics.finalGlideDistToGoal;
     }
@@ -3179,8 +3215,21 @@ function getXValue(track, type) {
     if (type === 'essGr') {
         return track.tactics.essGrNeededToGoal;
     }
-    if (type === 'maxSpeed') {
-        return track.tactics.maxSpeed10Sec;
+    if (type === 'score') {
+        const s = (track.tactics && track.tactics.finalScore !== undefined) ? track.tactics.finalScore : track.totalScore;
+        return (s !== undefined && s !== null && !isNaN(s)) ? s : null;
+    }
+    return null;
+}
+
+function getYValue(track, yStat) {
+    if (!track.tactics) return null;
+    if (yStat === 'score') {
+        const s = (track.tactics && track.tactics.finalScore !== undefined) ? track.tactics.finalScore : track.totalScore;
+        return (s !== undefined && s !== null && !isNaN(s)) ? s : null;
+    }
+    if (yStat === 'speedSectionTime') {
+        return (track.tactics.speedSectionTime !== null && track.tactics.speedSectionTime !== undefined) ? track.tactics.speedSectionTime : null;
     }
     return null;
 }
@@ -3284,22 +3333,36 @@ function highlightPilot(track) {
 }
 
 function updateStatsAnalysis() {
+    const yStatSelect = document.getElementById('chart-y-select');
     const xStatSelect = document.getElementById('chart-x-select');
     const fitSelect = document.getElementById('chart-fit-select');
     if (!xStatSelect || !fitSelect) return;
     
+    const yStat = yStatSelect ? yStatSelect.value : 'score';
     const xStat = xStatSelect.value;
     const fitType = fitSelect.value;
-    const xLabel = xStatSelect.selectedOptions[0].text;
-    
+    const xLabel = xStatSelect.selectedOptions && xStatSelect.selectedOptions[0] ? xStatSelect.selectedOptions[0].text : xStat;
+    const yLabel = yStat === 'score' ? 'Task Score (GAP Points)' : 'ESS Time (HH:MM:SS)';
+
+    const sectionTitle = document.getElementById('correlation-section-title');
+    if (sectionTitle) {
+        sectionTitle.textContent = yStat === 'score' ? 'Performance Correlation (vs Task Score)' : 'Performance Correlation (vs ESS Time)';
+    }
+    const tableTitle = document.getElementById('correlation-table-title');
+    if (tableTitle) {
+        tableTitle.textContent = `Correlation Table (vs ${yStat === 'score' ? 'Task Score' : 'ESS Time'})`;
+    }
+
     const dataPoints = [];
     state.tracks.forEach(track => {
-        if (track.visible !== false && track.tactics && track.tactics.speedSectionTime !== null && track.tactics.speedSectionTime !== undefined) {
+        if (track.visible !== false && track.tactics) {
+            const yVal = getYValue(track, yStat);
             const xVal = getXValue(track, xStat);
-            if (xVal !== null && xVal !== undefined && !isNaN(xVal)) {
+            if (yVal !== null && yVal !== undefined && !isNaN(yVal) &&
+                xVal !== null && xVal !== undefined && !isNaN(xVal)) {
                 dataPoints.push({
                     x: xVal,
-                    y: track.tactics.speedSectionTime,
+                    y: yVal,
                     pilot: track
                 });
             }
@@ -3315,21 +3378,25 @@ function updateStatsAnalysis() {
     // Pearson correlation table update
     if (tableBody) {
         const statsToCompare = [
+            { key: 'distFlown', label: 'Distance Flown (km)' },
+            { key: 'maxSpeed', label: 'Max Speed (km/h)' },
+            { key: 'startDelay', label: 'Start Gate Delay (min)' },
             { key: 'fgDist', label: 'FG Dist (km)' },
             { key: 'fgGr', label: 'FG GR' },
             { key: 'essAlt', label: 'ESS Alt AGL (ft)' },
-            { key: 'essGr', label: 'ESS GR' },
-            { key: 'maxSpeed', label: 'Max Speed (km/h)' }
+            { key: 'essGr', label: 'ESS GR' }
         ];
         
         let tableHtml = '';
         statsToCompare.forEach(stat => {
             const tempPoints = [];
             state.tracks.forEach(track => {
-                if (track.visible !== false && track.tactics && track.tactics.speedSectionTime !== null && track.tactics.speedSectionTime !== undefined) {
+                if (track.visible !== false && track.tactics) {
+                    const yVal = getYValue(track, yStat);
                     const xVal = getXValue(track, stat.key);
-                    if (xVal !== null && xVal !== undefined && !isNaN(xVal)) {
-                        tempPoints.push({ x: xVal, y: track.tactics.speedSectionTime });
+                    if (yVal !== null && yVal !== undefined && !isNaN(yVal) &&
+                        xVal !== null && xVal !== undefined && !isNaN(xVal)) {
+                        tempPoints.push({ x: xVal, y: yVal });
                     }
                 }
             });
@@ -3351,11 +3418,12 @@ function updateStatsAnalysis() {
                 }
                 
                 const dirStr = tempR < 0 ? ' (Neg)' : ' (Pos)';
+                const isGood = (yStat === 'score') ? (tempR > 0) : (tempR < 0);
                 
                 tableHtml += `
                     <tr>
                         <td>${stat.label}</td>
-                        <td class="coef-val" style="color: ${tempR < 0 ? '#4ade80' : '#f87171'}">${tempR.toFixed(2)}</td>
+                        <td class="coef-val" style="color: ${isGood ? '#4ade80' : '#f87171'}">${tempR.toFixed(2)}</td>
                         <td><span class="strength-badge ${badgeClass}">${strengthStr}${dirStr}</span></td>
                     </tr>
                 `;
@@ -3374,7 +3442,9 @@ function updateStatsAnalysis() {
 
     if (dataPoints.length < 2) {
         if (coefEl) coefEl.textContent = 'r = --';
-        if (descEl) descEl.textContent = 'Needs at least 2 pilots with completed speed runs.';
+        if (descEl) descEl.textContent = (yStat === 'score')
+            ? 'Needs at least 2 pilots with valid task scores.'
+            : 'Needs at least 2 pilots with completed speed runs.';
         if (optimalCard) optimalCard.classList.add('hidden');
         if (statsChart) {
             statsChart.destroy();
@@ -3397,12 +3467,22 @@ function updateStatsAnalysis() {
     else strengthDesc = 'Very Weak/No';
     
     let directionDesc = '';
-    if (r < -0.1) {
-        directionDesc = `Negative Correlation (higher ${xLabel} correlates with faster/shorter ESS Time)`;
-    } else if (r > 0.1) {
-        directionDesc = `Positive Correlation (higher ${xLabel} correlates with slower/longer ESS Time)`;
+    if (yStat === 'score') {
+        if (r > 0.1) {
+            directionDesc = `Positive Correlation (higher ${xLabel} correlates with higher Task Score)`;
+        } else if (r < -0.1) {
+            directionDesc = `Negative Correlation (higher ${xLabel} correlates with lower Task Score)`;
+        } else {
+            directionDesc = `No linear directional trend with Task Score`;
+        }
     } else {
-        directionDesc = `No linear directional trend with ESS Time`;
+        if (r < -0.1) {
+            directionDesc = `Negative Correlation (higher ${xLabel} correlates with faster/shorter ESS Time)`;
+        } else if (r > 0.1) {
+            directionDesc = `Positive Correlation (higher ${xLabel} correlates with slower/longer ESS Time)`;
+        } else {
+            directionDesc = `No linear directional trend with ESS Time`;
+        }
     }
     
     if (descEl) descEl.textContent = `${strengthDesc} ${directionDesc}`;
@@ -3433,12 +3513,25 @@ function updateStatsAnalysis() {
                 trendlinePoints.push({ x: x, y: a * x * x + b * x + c });
             }
             
-            if (a > 0) {
-                const x_opt = -b / (2 * a);
-                if (x_opt >= minX - pad && x_opt <= maxX + pad) {
-                    showOptimal = true;
-                    const y_opt = a * x_opt * x_opt + b * x_opt + c;
-                    optimalValText = `Based on a quadratic curve fit, the optimal <strong>${xLabel}</strong> for minimum ESS Time is approximately <strong>${x_opt.toFixed(2)}</strong>, corresponding to an expected ESS Time of <strong>${formatTime(y_opt)}</strong>.`;
+            if (yStat === 'score') {
+                // For score, peak (maximum) is optimal -> a < 0
+                if (a < 0) {
+                    const x_opt = -b / (2 * a);
+                    if (x_opt >= minX - pad && x_opt <= maxX + pad) {
+                        showOptimal = true;
+                        const y_opt = a * x_opt * x_opt + b * x_opt + c;
+                        optimalValText = `Based on a quadratic curve fit, the optimal <strong>${xLabel}</strong> for maximum Task Score is approximately <strong>${x_opt.toFixed(2)}</strong>, corresponding to an expected Task Score of <strong>${Math.round(y_opt)} pts</strong>.`;
+                    }
+                }
+            } else {
+                // For ESS time, trough (minimum) is optimal -> a > 0
+                if (a > 0) {
+                    const x_opt = -b / (2 * a);
+                    if (x_opt >= minX - pad && x_opt <= maxX + pad) {
+                        showOptimal = true;
+                        const y_opt = a * x_opt * x_opt + b * x_opt + c;
+                        optimalValText = `Based on a quadratic curve fit, the optimal <strong>${xLabel}</strong> for minimum ESS Time is approximately <strong>${x_opt.toFixed(2)}</strong>, corresponding to an expected ESS Time of <strong>${formatTime(y_opt)}</strong>.`;
+                    }
                 }
             }
         }
@@ -3489,10 +3582,17 @@ function updateStatsAnalysis() {
             showLine: true
         });
     }
+
+    // If y-scale mode changed, recreate chart to reset tick formatting cleanly
+    if (statsChart && statsChart._lastYStat !== yStat) {
+        statsChart.destroy();
+        statsChart = null;
+    }
     
     if (statsChart) {
         statsChart.data = chartData;
         statsChart.options.scales.x.title.text = xLabel;
+        statsChart.options.scales.y.title.text = yLabel;
         statsChart.update();
     } else {
         statsChart = new Chart(ctx, {
@@ -3519,7 +3619,9 @@ function updateStatsAnalysis() {
                                     } else {
                                         xValStr = raw.x.toFixed(1);
                                     }
-                                    return `${raw.pilotName}: ${xTitle} = ${xValStr}, ESS Time = ${formatTime(raw.y)}`;
+                                    const yValStr = (yStat === 'score') ? `${Math.round(raw.y)} pts` : formatTime(raw.y);
+                                    const yTitle = (yStat === 'score') ? 'Task Score' : 'ESS Time';
+                                    return `${raw.pilotName}: ${xTitle} = ${xValStr}, ${yTitle} = ${yValStr}`;
                                 }
                                 return null;
                             }
@@ -3545,7 +3647,7 @@ function updateStatsAnalysis() {
                     y: {
                         title: {
                             display: true,
-                            text: 'ESS Time (HH:MM:SS)',
+                            text: yLabel,
                             color: '#e2e8f0'
                         },
                         grid: {
@@ -3554,7 +3656,7 @@ function updateStatsAnalysis() {
                         ticks: {
                             color: '#94a3b8',
                             callback: function(value) {
-                                return formatTime(value);
+                                return (yStat === 'score') ? `${Math.round(value)} pts` : formatTime(value);
                             }
                         }
                     }
@@ -3576,6 +3678,7 @@ function updateStatsAnalysis() {
                 }
             }
         });
+        statsChart._lastYStat = yStat;
     }
 }
 
