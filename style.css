@@ -224,6 +224,19 @@ body {
     font-size: 0.75rem;
 }
 
+select optgroup {
+    background-color: var(--bg-panel);
+    color: var(--accent);
+    font-weight: 700;
+    font-style: normal;
+}
+
+select option {
+    background-color: var(--bg-card);
+    color: var(--text-main);
+}
+
+
 .table-container {
     flex: 1;
     overflow-y: auto;

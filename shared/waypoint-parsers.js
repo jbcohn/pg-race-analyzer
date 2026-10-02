@@ -127,8 +127,8 @@ export function parseTaskCoordinates(text) {
         let elev = 0;
         let id = null;
 
-        // Pattern 1: Lat: XX.XXXX Lon: YY.YYYY
-        const coordPattern = /Lat:\s*([-\d.]+)\s+Lon:\s*([-\d.]+)/i;
+        // Pattern 1: Lat: XX.XXXX[,] Lon/Lng: YY.YYYY
+        const coordPattern = /Lat:\s*([-\d.]+)[,\s]+(?:Lon|Lng):\s*([-\d.]+)/i;
         const coordMatch = coordPattern.exec(line);
         if (coordMatch) {
             lat = parseFloat(coordMatch[1]);
@@ -158,10 +158,13 @@ export function parseTaskCoordinates(text) {
                 }
             }
             
-            // Extract elevation (look for number followed by 'm' immediately before "Lat:")
-            const elevMatch = line.match(/(\d+)\s*m\s+Lat:/);
-            if (elevMatch) {
-                elev = parseInt(elevMatch[1], 10);
+            // Extract elevation: look before "Lat:" or after "Lon:"
+            const elevBeforeMatch = line.match(/(\d+(?:\.\d+)?)\s*m\s+Lat:/i);
+            const elevAfterMatch = line.substring(coordMatch.index + coordMatch[0].length).match(/(\d+(?:\.\d+)?)\s*m/i);
+            if (elevBeforeMatch) {
+                elev = parseInt(elevBeforeMatch[1], 10);
+            } else if (elevAfterMatch) {
+                elev = parseInt(elevAfterMatch[1], 10);
             }
         } else {
             // Pattern 2: lat, lng [ @ elev m ] e.g. 38.540820, -112.073520 @ 3403 m

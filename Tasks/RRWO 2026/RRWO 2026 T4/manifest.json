@@ -1,0 +1,11 @@
+{
+    "task_id": 1454,
+    "group_id": 8002,
+    "task_name": "Thursday",
+    "task_day": "2026-09-24",
+    "created_utc": "2026-09-26T17:24:05+00:00",
+    "igc_files": 56,
+    "skipped": [
+        "700 (no track points)"
+    ]
+}

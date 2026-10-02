@@ -15,6 +15,15 @@ function encodePath(path) {
     return path.split('/').map(segment => encodeURIComponent(segment)).join('/');
 }
 
+function cacheBustUrl(path) {
+    const encoded = encodePath(path);
+    if (typeof window !== 'undefined' && window.location.protocol === 'file:') {
+        return encoded;
+    }
+    return `${encoded}?t=${Date.now()}`;
+}
+
+
 // Application State
 const state = {
     map: null,
@@ -127,7 +136,7 @@ let sideView;
 
 async function loadLocalDem() {
     try {
-        const response = await fetch(`${encodePath('Tasks/chelan-dem.json')}?t=${Date.now()}`);
+        const response = await fetch(cacheBustUrl('Tasks/chelan-dem.json'));
         if (!response.ok) throw new Error(`HTTP error ${response.status}`);
         state.localDem = await response.json();
         console.log("Successfully loaded local DEM grid:", state.localDem.rows, "x", state.localDem.cols);
@@ -531,7 +540,7 @@ async function loadOverallStandingsForTask(taskId, customPath) {
     }
     
     try {
-        const res = await fetch(`${encodePath(standingsFile)}?t=${Date.now()}`);
+        const res = await fetch(cacheBustUrl(standingsFile));
         if (!res.ok) throw new Error(`Failed to load overall standings: ${res.statusText}`);
         const text = await res.text();
         const lines = text.split('\n');
@@ -560,9 +569,14 @@ async function loadOverallStandingsForTask(taskId, customPath) {
 }
 
 function setupPredefinedTasks() {
-    fetch(`${encodePath('Tasks/manifest.json')}?t=${Date.now()}`)
+    fetch(cacheBustUrl('Tasks/manifest.json'))
         .then(res => {
-            if (!res.ok) throw new Error('No predefined tasks found');
+            if (!res.ok) {
+                return fetch(cacheBustUrl('manifest.json')).then(r => {
+                    if (!r.ok) throw new Error('No predefined tasks found');
+                    return r.json();
+                });
+            }
             return res.json();
         })
         .then(manifest => {
@@ -570,16 +584,26 @@ function setupPredefinedTasks() {
             const select = document.getElementById('task-select');
             if (!container || !select) return;
             
-            // Clear default and populate options
+            // Clear default and populate options grouped by comp
             select.innerHTML = '<option value="">-- Select Task --</option>';
+            let currentGroup = null;
+            let currentComp = null;
             manifest.tasks.forEach(task => {
+                const compName = task.comp || 'Other Tasks';
+                if (compName !== currentComp) {
+                    currentComp = compName;
+                    currentGroup = document.createElement('optgroup');
+                    currentGroup.label = currentComp;
+                    select.appendChild(currentGroup);
+                }
                 const opt = document.createElement('option');
                 opt.value = task.id;
                 opt.textContent = task.name;
-                select.appendChild(opt);
+                (currentGroup || select).appendChild(opt);
             });
             
             container.style.display = 'block';
+            console.log(`Loaded ${manifest.tasks.length} predefined tasks into selector.`);
             
             select.addEventListener('change', async (e) => {
                 const val = e.target.value;
@@ -711,7 +735,7 @@ function setupPredefinedTasks() {
                     const wptFile = taskInfo.waypoint_file || manifest.waypoint_file;
                     if (wptFile) {
                         if (loaderTextEl) loaderTextEl.textContent = 'Loading waypoints...';
-                        const wptRes = await fetch(`${encodePath(wptFile)}?t=${Date.now()}`);
+                        const wptRes = await fetch(cacheBustUrl(wptFile));
                         const wptText = await wptRes.text();
                         const newWpts = parseWaypointFile(wptText, wptFile);
                         Object.assign(state.waypoints, newWpts);
@@ -721,7 +745,7 @@ function setupPredefinedTasks() {
                     // 2. Load task definition
                     if (taskInfo.task_file) {
                         if (loaderTextEl) loaderTextEl.textContent = 'Loading task definition...';
-                        const taskRes = await fetch(`${encodePath(taskInfo.task_file)}?t=${Date.now()}`);
+                        const taskRes = await fetch(cacheBustUrl(taskInfo.task_file));
                         const taskText = await taskRes.text();
                         document.getElementById('task-textarea').value = taskText;
                         try { localStorage.setItem('pg-task-text', taskText); } catch(err) {}
@@ -740,7 +764,7 @@ function setupPredefinedTasks() {
                         const cleanName = formatPilotName(filename);
                         if (loaderTextEl) loaderTextEl.textContent = `Fetching ${cleanName}...`;
                         
-                        const trackRes = await fetch(`${encodePath(url)}?t=${Date.now()}`);
+                        const trackRes = await fetch(cacheBustUrl(url));
                         const text = await trackRes.text();
                         const trackPoints = parseIGC(text);
                         if (!trackPoints || trackPoints.length === 0) return;
@@ -1169,13 +1193,14 @@ function drawTask() {
             const firstCell = parts[0].toLowerCase().replace(/[.\s]/g, '');
             if (firstCell === 'no') continue;
 
-            // Row number cell may contain the type keyword, e.g. "2 SS" or "7 ES"
+            // Row number cell may contain the type keyword, e.g. "2SS", "2 SS", "6ES", "6 ES"
             const rowCell = (parts[colMap.noIdx] || parts[0]).toUpperCase();
             id = parts[colMap.idIdx].replace(/[^\w-]/g, '').trim();
             type = 'turnpoint';
-            if (rowCell.includes(' SS')) type = 'ss';
-            else if (rowCell.includes(' ES')) type = 'es';
-            else if (id.toUpperCase() === 'LAUNCH') type = 'launch';
+            if (rowCell.includes('SS')) type = 'ss';
+            else if (rowCell.includes('ES')) type = 'es';
+            else if (id.toUpperCase() === 'LAUNCH' || rowCell === '1' || rowCell.includes('TAKEOFF') || rowCell.includes('LAUNCH')) type = 'launch';
+            else if (rowCell.includes('GOAL')) type = 'goal';
 
             // Radius column: strip non-numeric, convert km→m
             if (colMap.radiusIdx !== -1 && parts.length > colMap.radiusIdx) {
@@ -2368,9 +2393,9 @@ function updatePlaybackState() {
             const p2 = pts[i + 1];
             const currentPos = interpolatePoint(p1, p2, state.currentTime);
             
-            // Calculate speed and GR (look back ~10 seconds for smoothing)
+            // Calculate speed and GR / climb rate (look back ~15 seconds for smoothing)
             let lookbackIdx = i;
-            while (lookbackIdx > 0 && pts[i].time - pts[lookbackIdx].time < 10) {
+            while (lookbackIdx > 0 && (currentPos.time - pts[lookbackIdx].time) < 15) {
                 lookbackIdx--;
             }
             
@@ -2769,27 +2794,35 @@ function updatePilotMarker(track, currentPos, prevPos) {
     
     if (prevPos && prevPos.time < currentPos.time && spdEl && grEl) {
         const dt = currentPos.time - prevPos.time; // seconds
-        const dDist = haversineDistance(prevPos, currentPos); // km
-        const dAlt = currentPos.alt - prevPos.alt; // meters
-        
-        // Speed in km/h
-        const speed = (dDist / dt) * 3600;
-        track.currentSpeed = speed;
-        spdEl.textContent = `${Math.round(speed)}`;
-        
-        // 1. Instantaneous Glide Ratio (always goes into the standard GR column)
-        let instGR = 0;
-        let instGRStr = '--';
-        if (dAlt < -0.1) {
-            instGR = (dDist * 1000) / Math.abs(dAlt);
-            instGRStr = instGR > 100 ? '99+' : instGR.toFixed(1);
-        } else if (dAlt > 0.1) {
-            instGRStr = 'Climb';
+        if (dt >= 1) {
+            const dDist = haversineDistance(prevPos, currentPos); // km
+            const dAlt = currentPos.alt - prevPos.alt; // meters
+            
+            // Speed in km/h
+            const speed = (dDist / dt) * 3600;
+            track.currentSpeed = speed;
+            spdEl.textContent = `${Math.round(speed)}`;
+            
+            // 1. Instantaneous Glide Ratio or Climb Rate (15s average)
+            const vz = dAlt / dt; // m/s
+            track.currentClimbRate = vz;
+            
+            let instGR = 0;
+            let instGRStr = '--';
+            if (vz >= 0.05) {
+                instGRStr = `+${vz.toFixed(1)}m/s`;
+            } else if (vz >= -0.05) {
+                instGRStr = '+0.0m/s';
+            } else {
+                instGR = (dDist * 1000) / Math.abs(dAlt);
+                instGRStr = instGR > 100 ? '99+' : instGR.toFixed(1);
+            }
+            track.currentInstGR = instGR;
+            grEl.textContent = instGRStr;
         } else {
-            instGRStr = 'Level';
+            spdEl.textContent = '--';
+            grEl.textContent = '--';
         }
-        track.currentInstGR = instGR;
-        grEl.textContent = instGRStr;
     } else {
         if (spdEl) spdEl.textContent = '--';
         if (grEl) grEl.textContent = '--';

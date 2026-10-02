@@ -310,44 +310,71 @@ export class SideView {
         }
         ctx.restore();
 
-        // --- 1. Waypoint Cylinder Crossing Lines ---
-        state.tracks.forEach(track => {
-            if (track.visible === false || !track.tactics || !track.tactics.grToGoalSeries) return;
+        // --- 1. Task Turnpoint Vertical Lines ---
+        for (let i = 0; i <= endGoalIdx; i++) {
+            const tp = state.task[i];
+            if (!tp) continue;
             
-            if (track.tactics.crossingDistances) {
-                for (const tpIdxStr in track.tactics.crossingDistances) {
-                    const tpIdx = parseInt(tpIdxStr, 10);
-                    const crossDist = track.tactics.crossingDistances[tpIdx];
-                    if (crossDist !== undefined) {
-                        const tp = state.task[tpIdx];
-                        if (!tp) continue;
-                        
-                        ctx.save();
-                        let strokeColor = 'rgba(59, 130, 246, 0.75)'; // blue
-                        if (tp.type === 'ss') {
-                            strokeColor = 'rgba(34, 197, 94, 0.75)'; // green
-                        } else if (tp.type === 'es') {
-                            strokeColor = 'rgba(249, 115, 22, 0.75)'; // orange
-                        } else if (tp.type === 'goal') {
-                            strokeColor = 'rgba(239, 68, 68, 0.75)'; // red
-                        }
-                        
-                        ctx.strokeStyle = strokeColor;
-                        ctx.lineWidth = 1.2;
-                        if (tp.type === 'turnpoint' || tp.isExit) {
-                            ctx.setLineDash([4, 4]);
-                        }
-                        
-                        const x = mapX(crossDist);
+            const distFlown = optTask ? optTask.distances[i] : (totalTaskDist - calculateRemainingLegs(state.task, i, endGoalIdx));
+            const radiusKm = (tp.radius || 0) / 1000;
+            let centerDist = distFlown;
+            if (tp.isExit) {
+                centerDist = i > 0 ? (optTask ? optTask.distances[i - 1] : 0) : 0;
+            } else if (tp.type === 'es' || tp.type === 'goal') {
+                centerDist = distFlown + radiusKm;
+            }
+
+            ctx.save();
+            let strokeColor = 'rgba(59, 130, 246, 0.6)'; // soft blue
+            if (tp.type === 'ss') {
+                strokeColor = 'rgba(34, 197, 94, 0.75)'; // green
+            } else if (tp.type === 'es') {
+                strokeColor = 'rgba(249, 115, 22, 0.75)'; // orange
+            } else if (tp.type === 'goal') {
+                strokeColor = 'rgba(239, 68, 68, 0.75)'; // red
+            }
+            
+            ctx.strokeStyle = strokeColor;
+            ctx.lineWidth = (tp.type === 'ss' || tp.type === 'es' || tp.type === 'goal') ? 1.5 : 1.0;
+            if (tp.type === 'turnpoint' || tp.isExit) {
+                ctx.setLineDash([4, 4]);
+            }
+            
+            const x = mapX(distFlown);
+            if (x >= 50 && x <= this.canvas.width) {
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, this.canvas.height - 25);
+                ctx.stroke();
+            }
+            ctx.restore();
+        }
+
+        // Draw individual crossing lines ONLY for the hovered or selected pilot
+        const focusTrack = this.hoveredPilot || (state.selectedTrackId ? state.tracks.find(t => t.id === state.selectedTrackId) : null);
+        if (focusTrack && focusTrack.tactics && focusTrack.tactics.crossingDistances) {
+            for (const tpIdxStr in focusTrack.tactics.crossingDistances) {
+                const tpIdx = parseInt(tpIdxStr, 10);
+                const crossDist = focusTrack.tactics.crossingDistances[tpIdx];
+                if (crossDist !== undefined) {
+                    const tp = state.task[tpIdx];
+                    if (!tp) continue;
+                    
+                    ctx.save();
+                    ctx.strokeStyle = this.resolveColor(focusTrack.color) || 'rgba(255, 255, 255, 0.9)';
+                    ctx.lineWidth = 1.5;
+                    ctx.setLineDash([2, 3]);
+                    const x = mapX(crossDist);
+                    if (x >= 50 && x <= this.canvas.width) {
                         ctx.beginPath();
                         ctx.moveTo(x, 0);
                         ctx.lineTo(x, this.canvas.height - 25);
                         ctx.stroke();
-                        ctx.restore();
                     }
+                    ctx.restore();
                 }
             }
-        });
+        }
 
         // --- 2. Ground Profile ---
         const panelBgColor = this.resolveColor('var(--bg-panel)');
@@ -528,7 +555,9 @@ export class SideView {
         }
 
 
-        // --- 2. Pilot Snail Trails ---
+        // --- 2. Pilot Snail Trails & Dots ---
+        const renderedLabels = [];
+
         state.tracks.forEach(track => {
             if (track.visible === false || !track.tactics || !track.tactics.grToGoalSeries) return;
             
@@ -602,13 +631,42 @@ export class SideView {
                 
                 const labelText = track.initials || track.name;
                 const textWidth = ctx.measureText(labelText).width;
+                const boxW = textWidth + 6;
+                const boxH = 12;
+                let labelX = lastX + 8;
+                let labelY = lastY;
+
+                // Adjust label position if overlapping previously rendered labels
+                let collision = true;
+                let attempts = 0;
+                let yOffset = 0;
+                while (collision && attempts < 6) {
+                    collision = false;
+                    const curBox = { x: labelX, y: labelY + yOffset - 6, w: boxW, h: boxH };
+                    for (const prev of renderedLabels) {
+                        if (curBox.x < prev.x + prev.w &&
+                            curBox.x + curBox.w > prev.x &&
+                            curBox.y < prev.y + prev.h &&
+                            curBox.y + curBox.h > prev.y) {
+                            collision = true;
+                            break;
+                        }
+                    }
+                    if (collision) {
+                        attempts++;
+                        yOffset = (attempts % 2 === 1) ? -(Math.ceil(attempts / 2) * 13) : (Math.ceil(attempts / 2) * 13);
+                    }
+                }
+
+                labelY += yOffset;
+                renderedLabels.push({ x: labelX, y: labelY - 6, w: boxW, h: boxH });
                 
                 // Draw background box for readability
                 ctx.fillStyle = 'rgba(15, 23, 42, 0.75)'; // dark background matching var(--bg-main)
-                ctx.fillRect(lastX + 8, lastY - 6, textWidth + 6, 12);
+                ctx.fillRect(labelX, labelY - 6, boxW, boxH);
                 
                 ctx.fillStyle = resolvedColor;
-                ctx.fillText(labelText, lastX + 11, lastY);
+                ctx.fillText(labelText, labelX + 3, labelY);
                 ctx.restore();
             }
         });
