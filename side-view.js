@@ -256,9 +256,9 @@ export class SideView {
                     if (df >= totalTaskDist) anyGoalCrossed = true;
                 }
             });
-            let calculatedMaxScale = totalTaskDist + goalRadiusKm;
+            let calculatedMaxScale = totalTaskDist + goalRadiusKm * 2;
             if (!anyGoalCrossed && maxDistFlown > 0 && maxDistFlown < totalTaskDist * 0.75) {
-                calculatedMaxScale = Math.min(calculatedMaxScale, maxDistFlown * 1.10 + goalRadiusKm);
+                calculatedMaxScale = Math.min(calculatedMaxScale, maxDistFlown * 1.10 + goalRadiusKm * 2);
             }
 
             let minAlt = Infinity;
@@ -399,15 +399,53 @@ export class SideView {
                 ctx.setLineDash([4, 4]);
             }
             
-            const x = mapX(distFlown);
-            if (x >= 50 && x <= this.canvas.width) {
+            const isGoal = (i === endGoalIdx || tp.type === 'goal');
+            const xEntry = mapX(distFlown);
+            const xExit = mapX(distFlown + 2 * radiusKm);
+            const cylinderWidth = Math.max(0, xExit - xEntry);
+
+            // Render shaded Goal Cylinder body
+            if (isGoal && radiusKm > 0 && xEntry <= this.canvas.width && xExit >= 50) {
+                ctx.save();
+                ctx.fillStyle = 'rgba(239, 68, 68, 0.12)';
+                ctx.fillRect(xEntry, 0, cylinderWidth, this.canvas.height - 25);
+
+                // Back edge line of cylinder
+                ctx.strokeStyle = 'rgba(239, 68, 68, 0.45)';
+                ctx.lineWidth = 1.0;
+                ctx.setLineDash([4, 4]);
                 ctx.beginPath();
-                ctx.moveTo(x, 0);
-                ctx.lineTo(x, this.canvas.height - 25);
+                ctx.moveTo(xExit, 0);
+                ctx.lineTo(xExit, this.canvas.height - 25);
                 ctx.stroke();
 
-                // If this is the goal line and elevated goal is enabled, render the elevated goal marker
-                if (i === endGoalIdx && state.elevatedGoalEnabled && state.elevatedGoalHeight > 0) {
+                // Center line of cylinder
+                const xCenter = mapX(distFlown + radiusKm);
+                ctx.strokeStyle = 'rgba(239, 68, 68, 0.25)';
+                ctx.setLineDash([2, 3]);
+                ctx.beginPath();
+                ctx.moveTo(xCenter, 0);
+                ctx.lineTo(xCenter, this.canvas.height - 25);
+                ctx.stroke();
+
+                // Top label on cylinder
+                ctx.fillStyle = 'rgba(239, 68, 68, 0.85)';
+                ctx.font = 'bold 10px Inter, Arial, sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'top';
+                ctx.fillText(`GOAL (${Math.round(tp.radius)}m)`, xCenter, 6);
+                ctx.restore();
+            }
+
+            // Draw front entry edge vertical line
+            if (xEntry >= 50 && xEntry <= this.canvas.width) {
+                ctx.beginPath();
+                ctx.moveTo(xEntry, 0);
+                ctx.lineTo(xEntry, this.canvas.height - 25);
+                ctx.stroke();
+
+                // If this is the goal line and elevated goal is enabled, render the elevated goal marker and floor across cylinder
+                if (isGoal && state.elevatedGoalEnabled && state.elevatedGoalHeight > 0) {
                     let goalElevFt = (terrainProfile && terrainProfile.length > 0)
                         ? terrainProfile[terrainProfile.length - 1].elevFt
                         : ((tp.elev || 0) * 3.28084);
@@ -416,25 +454,27 @@ export class SideView {
                     const yElevated = mapY(elevatedAltFt);
 
                     ctx.save();
-                    // Subtle highlight bar between ground and elevated goal
-                    ctx.fillStyle = 'rgba(245, 158, 11, 0.25)';
-                    ctx.fillRect(x - 3, Math.min(yElevated, yGoalGround), 6, Math.abs(yElevated - yGoalGround));
+                    // Subtle penalty buffer inside cylinder below elevated goal height
+                    if (cylinderWidth > 0) {
+                        ctx.fillStyle = 'rgba(245, 158, 11, 0.2)';
+                        ctx.fillRect(xEntry, Math.min(yElevated, yGoalGround), cylinderWidth, Math.abs(yElevated - yGoalGround));
+                    }
 
-                    // Target line/tick at elevated goal altitude
+                    // Target floor line across the goal cylinder
                     ctx.strokeStyle = '#f59e0b'; // amber / gold
                     ctx.lineWidth = 2.5;
                     ctx.setLineDash([]);
                     ctx.beginPath();
-                    ctx.moveTo(x - 14, yElevated);
-                    ctx.lineTo(x + 14, yElevated);
+                    ctx.moveTo(xEntry, yElevated);
+                    ctx.lineTo(cylinderWidth > 0 ? xExit : xEntry + 18, yElevated);
                     ctx.stroke();
 
-                    // Text label beside marker
+                    // Text label beside marker at cylinder entry
                     ctx.fillStyle = '#fbbf24';
                     ctx.font = 'bold 9px Inter, Arial, sans-serif';
                     ctx.textAlign = 'right';
                     ctx.textBaseline = 'middle';
-                    ctx.fillText(`+${Math.round(state.elevatedGoalHeight)}m AGL`, x - 18, yElevated);
+                    ctx.fillText(`+${Math.round(state.elevatedGoalHeight)}m AGL`, xEntry - 6, yElevated);
                     ctx.restore();
                 }
             }
