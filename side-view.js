@@ -291,12 +291,12 @@ export class SideView {
 
             if (state.drawGlideSlope) {
                 const ratio = state.glideSlopeRatio || 10;
-                let goalElevFt = (goalTP.elev || 0) * 3.28084;
-                if (goalElevFt === 0 && terrainProfile && terrainProfile.length > 0) {
-                    goalElevFt = terrainProfile[terrainProfile.length - 1].elevFt;
-                }
+                const goalDist = optTask ? optTask.distances[endGoalIdx] : totalTaskDist;
+                let goalElevFt = (terrainProfile && terrainProfile.length > 0)
+                    ? terrainProfile[terrainProfile.length - 1].elevFt
+                    : ((goalTP.elev || 0) * 3.28084);
                 const elevatedOffsetFt = (state.elevatedGoalEnabled && state.elevatedGoalHeight > 0) ? state.elevatedGoalHeight * 3.28084 : 0;
-                const slopeStartAlt = goalElevFt + elevatedOffsetFt + (calculatedMaxScale * 3280.84 / ratio);
+                const slopeStartAlt = goalElevFt + elevatedOffsetFt + (goalDist * 3280.84 / ratio);
                 if (slopeStartAlt > maxAlt && slopeStartAlt < 25000) {
                     maxAlt = Math.max(maxAlt, slopeStartAlt + 300);
                 }
@@ -408,10 +408,9 @@ export class SideView {
 
                 // If this is the goal line and elevated goal is enabled, render the elevated goal marker
                 if (i === endGoalIdx && state.elevatedGoalEnabled && state.elevatedGoalHeight > 0) {
-                    let goalElevFt = (tp.elev || 0) * 3.28084;
-                    if (goalElevFt === 0 && terrainProfile && terrainProfile.length > 0) {
-                        goalElevFt = terrainProfile[terrainProfile.length - 1].elevFt;
-                    }
+                    let goalElevFt = (terrainProfile && terrainProfile.length > 0)
+                        ? terrainProfile[terrainProfile.length - 1].elevFt
+                        : ((tp.elev || 0) * 3.28084);
                     const elevatedAltFt = goalElevFt + state.elevatedGoalHeight * 3.28084;
                     const yGoalGround = mapY(goalElevFt);
                     const yElevated = mapY(elevatedAltFt);
@@ -601,17 +600,15 @@ export class SideView {
         if (state.drawGlideSlope && state.task && state.task.length > 0) {
             const ratio = state.glideSlopeRatio || 10;
             const goalTP = state.task[endGoalIdx];
+            const goalDist = optTask ? optTask.distances[endGoalIdx] : totalTaskDist;
 
-            // Goal ground elevation: use the waypoint's own elev field when available
-            // (most waypoint files include it). Fall back to the terrain profile's
-            // last sample only when the waypoint has no elevation data (elev === 0).
-            let goalElevFt = (goalTP.elev || 0) * 3.28084;
-            if (goalElevFt === 0 && terrainProfile && terrainProfile.length > 0) {
-                goalElevFt = terrainProfile[terrainProfile.length - 1].elevFt;
-            }
+            // Goal ground elevation: prefer terrain profile at goal if loaded, fallback to waypoint elev
+            let goalElevFt = (terrainProfile && terrainProfile.length > 0)
+                ? terrainProfile[terrainProfile.length - 1].elevFt
+                : ((goalTP.elev || 0) * 3.28084);
 
             const elevatedOffsetFt = (state.elevatedGoalEnabled && state.elevatedGoalHeight > 0) ? state.elevatedGoalHeight * 3.28084 : 0;
-            const lineEndDist = maxScaleDist;
+            const lineEndDist = goalDist;
             const lineEndAlt  = goalElevFt + elevatedOffsetFt; // goal elevation at cylinder edge (+ elevated goal offset if enabled)
 
             const startX   = 0;
