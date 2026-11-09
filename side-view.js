@@ -242,7 +242,7 @@ export class SideView {
         const goalRadiusKm = (goalTP.radius || 0) / 1000;
         const terrainProfile = state.terrainProfile || null;
         // Cache bounds if tracks and task have not changed to eliminate 500,000-point loops on every hover
-        const tracksKey = `${state.tracks.length}_${state.tracks.filter(t => t.visible !== false).length}_${state.activeTaskName || ''}_${terrainProfile ? terrainProfile.length : 0}`;
+        const tracksKey = `${state.tracks.length}_${state.tracks.filter(t => t.visible !== false).length}_${state.activeTaskName || ''}_${terrainProfile ? terrainProfile.length : 0}_${state.drawGlideSlope ? state.glideSlopeRatio : 0}_${state.elevatedGoalEnabled ? (state.elevatedGoalHeight || 100) : 0}`;
         if (!this._cachedBounds || this._cachedBounds.key !== tracksKey) {
             let maxDistFlown = 0;
             let anyGoalCrossed = false;
@@ -288,6 +288,19 @@ export class SideView {
             if (maxAlt === -Infinity) maxAlt = 2000;
             maxAlt += 500;
             if (maxAlt - minAlt < 1000) maxAlt = minAlt + 1000;
+
+            if (state.drawGlideSlope) {
+                const ratio = state.glideSlopeRatio || 10;
+                let goalElevFt = (goalTP.elev || 0) * 3.28084;
+                if (goalElevFt === 0 && terrainProfile && terrainProfile.length > 0) {
+                    goalElevFt = terrainProfile[terrainProfile.length - 1].elevFt;
+                }
+                const elevatedOffsetFt = (state.elevatedGoalEnabled && state.elevatedGoalHeight > 0) ? state.elevatedGoalHeight * 3.28084 : 0;
+                const slopeStartAlt = goalElevFt + elevatedOffsetFt + (calculatedMaxScale * 3280.84 / ratio);
+                if (slopeStartAlt > maxAlt && slopeStartAlt < 25000) {
+                    maxAlt = Math.max(maxAlt, slopeStartAlt + 300);
+                }
+            }
 
             this._cachedBounds = {
                 key: tracksKey,
@@ -392,6 +405,39 @@ export class SideView {
                 ctx.moveTo(x, 0);
                 ctx.lineTo(x, this.canvas.height - 25);
                 ctx.stroke();
+
+                // If this is the goal line and elevated goal is enabled, render the elevated goal marker
+                if (i === endGoalIdx && state.elevatedGoalEnabled && state.elevatedGoalHeight > 0) {
+                    let goalElevFt = (tp.elev || 0) * 3.28084;
+                    if (goalElevFt === 0 && terrainProfile && terrainProfile.length > 0) {
+                        goalElevFt = terrainProfile[terrainProfile.length - 1].elevFt;
+                    }
+                    const elevatedAltFt = goalElevFt + state.elevatedGoalHeight * 3.28084;
+                    const yGoalGround = mapY(goalElevFt);
+                    const yElevated = mapY(elevatedAltFt);
+
+                    ctx.save();
+                    // Subtle highlight bar between ground and elevated goal
+                    ctx.fillStyle = 'rgba(245, 158, 11, 0.25)';
+                    ctx.fillRect(x - 3, Math.min(yElevated, yGoalGround), 6, Math.abs(yElevated - yGoalGround));
+
+                    // Target line/tick at elevated goal altitude
+                    ctx.strokeStyle = '#f59e0b'; // amber / gold
+                    ctx.lineWidth = 2.5;
+                    ctx.setLineDash([]);
+                    ctx.beginPath();
+                    ctx.moveTo(x - 14, yElevated);
+                    ctx.lineTo(x + 14, yElevated);
+                    ctx.stroke();
+
+                    // Text label beside marker
+                    ctx.fillStyle = '#fbbf24';
+                    ctx.font = 'bold 9px Inter, Arial, sans-serif';
+                    ctx.textAlign = 'right';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(`+${Math.round(state.elevatedGoalHeight)}m AGL`, x - 18, yElevated);
+                    ctx.restore();
+                }
             }
             ctx.restore();
         }
@@ -564,8 +610,9 @@ export class SideView {
                 goalElevFt = terrainProfile[terrainProfile.length - 1].elevFt;
             }
 
+            const elevatedOffsetFt = (state.elevatedGoalEnabled && state.elevatedGoalHeight > 0) ? state.elevatedGoalHeight * 3.28084 : 0;
             const lineEndDist = maxScaleDist;
-            const lineEndAlt  = goalElevFt; // goal elevation at the cylinder edge
+            const lineEndAlt  = goalElevFt + elevatedOffsetFt; // goal elevation at cylinder edge (+ elevated goal offset if enabled)
 
             const startX   = 0;
             const startAlt = lineEndAlt + lineEndDist * 3280.84 / ratio;
@@ -595,7 +642,8 @@ export class SideView {
 
             ctx.translate(mapX(labelX), mapY(labelAlt));
             ctx.rotate(angle);
-            ctx.fillText(`Glide Slope ${ratio}:1`, 10, -4);
+            const elevatedLabel = (state.elevatedGoalEnabled && state.elevatedGoalHeight > 0) ? ` (+${Math.round(state.elevatedGoalHeight)}m goal)` : '';
+            ctx.fillText(`Glide Slope ${ratio}:1${elevatedLabel}`, 10, -4);
 
             ctx.restore();
         }

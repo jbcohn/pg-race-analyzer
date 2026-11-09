@@ -53,6 +53,8 @@ const state = {
     overallStandings: {},
     drawGlideSlope: false,
     glideSlopeRatio: 10,
+    elevatedGoalEnabled: false,
+    elevatedGoalHeight: 100,
     activeTaskName: "No Task Active",
     topoMap: null,
     satelliteMap: null,
@@ -567,6 +569,11 @@ async function loadOverallStandingsForTask(taskId, customPath) {
             }
         });
         console.log(`Successfully loaded overall standings (${standingsFile}) for`, Object.keys(state.overallStandings).length, 'pilots');
+        if (/Ht\s*Pn|Height\s*Pn/i.test(text)) {
+            state.elevatedGoalEnabled = true;
+            if (!state.elevatedGoalHeight) state.elevatedGoalHeight = 100;
+            syncElevatedGoalUI();
+        }
     } catch (err) {
         console.error('Error loading overall standings:', err);
     }
@@ -717,6 +724,22 @@ async function loadPredefinedTaskById(val) {
             Object.assign(state.waypoints, newWpts);
             try { localStorage.setItem('pg-waypoints', JSON.stringify(state.waypoints)); } catch(err) {}
         }
+
+        // Configure elevated goal if task has it specified
+        if (taskInfo.elevated_goal_height !== undefined && Number(taskInfo.elevated_goal_height) > 0) {
+            state.elevatedGoalEnabled = true;
+            state.elevatedGoalHeight = Number(taskInfo.elevated_goal_height);
+        } else {
+            try {
+                const storedElevated = localStorage.getItem('pg-elevated-goal');
+                if (storedElevated !== null) state.elevatedGoalEnabled = storedElevated === 'true';
+                const storedHeight = localStorage.getItem('pg-elevated-goal-height');
+                if (storedHeight !== null && !isNaN(parseFloat(storedHeight))) {
+                    state.elevatedGoalHeight = parseFloat(storedHeight);
+                }
+            } catch(e) {}
+        }
+        syncElevatedGoalUI();
 
         // 2. Load task definition
         if (taskInfo.task_file) {
@@ -959,6 +982,17 @@ function setupSidebarControls() {
     });
 }
 
+function syncElevatedGoalUI() {
+    const chk = document.getElementById('chk-elevated-goal');
+    const input = document.getElementById('input-elevated-goal-height');
+    const labelFt = document.getElementById('label-elevated-goal-ft');
+    const wrapper = document.getElementById('elevated-goal-controls-wrapper');
+    if (chk) chk.checked = !!state.elevatedGoalEnabled;
+    if (input) input.value = state.elevatedGoalHeight || 100;
+    if (labelFt) labelFt.textContent = Math.round((state.elevatedGoalHeight || 100) * 3.28084);
+    if (wrapper) wrapper.style.display = state.elevatedGoalEnabled ? 'flex' : 'none';
+}
+
 function initSettingsMenu() {
     const modal = document.getElementById('settings-modal');
     const openBtn = document.getElementById('btn-open-settings');
@@ -975,6 +1009,9 @@ function initSettingsMenu() {
                 state.drawGlideSlope = chk.checked;
                 wrapper.style.display = chk.checked ? 'flex' : 'none';
             }
+
+            // Sync elevated goal controls on every open
+            syncElevatedGoalUI();
             
             // Sync coin controls wrapper on every open
             const coinChk = document.getElementById('chk-coin-enable');
@@ -1044,6 +1081,52 @@ function initSettingsMenu() {
             }
             if (sideView && state.task && state.task.length > 0) {
                 sideView.render(state);
+            }
+        });
+    }
+
+    // Elevated Goal Controls wiring
+    const elevatedGoalCheckbox = document.getElementById('chk-elevated-goal');
+    const elevatedGoalInput = document.getElementById('input-elevated-goal-height');
+    const elevatedGoalControlsWrapper = document.getElementById('elevated-goal-controls-wrapper');
+    const labelElevatedGoalFt = document.getElementById('label-elevated-goal-ft');
+
+    if (elevatedGoalCheckbox) {
+        try {
+            const storedElevated = localStorage.getItem('pg-elevated-goal');
+            if (storedElevated !== null) state.elevatedGoalEnabled = storedElevated === 'true';
+            const storedHeight = localStorage.getItem('pg-elevated-goal-height');
+            if (storedHeight !== null && !isNaN(parseFloat(storedHeight))) {
+                state.elevatedGoalHeight = parseFloat(storedHeight);
+            }
+        } catch(e) {}
+
+        syncElevatedGoalUI();
+
+        elevatedGoalCheckbox.addEventListener('change', (e) => {
+            state.elevatedGoalEnabled = e.target.checked;
+            try { localStorage.setItem('pg-elevated-goal', state.elevatedGoalEnabled); } catch(err) {}
+            if (elevatedGoalControlsWrapper) {
+                elevatedGoalControlsWrapper.style.display = e.target.checked ? 'flex' : 'none';
+            }
+            if (sideView && state.task && state.task.length > 0) {
+                sideView.render(state);
+            }
+        });
+    }
+
+    if (elevatedGoalInput) {
+        elevatedGoalInput.addEventListener('input', (e) => {
+            const val = parseFloat(e.target.value);
+            if (!isNaN(val) && val >= 0) {
+                state.elevatedGoalHeight = val;
+                try { localStorage.setItem('pg-elevated-goal-height', state.elevatedGoalHeight); } catch(err) {}
+                if (labelElevatedGoalFt) {
+                    labelElevatedGoalFt.textContent = Math.round(val * 3.28084);
+                }
+                if (sideView && state.task && state.task.length > 0) {
+                    sideView.render(state);
+                }
             }
         });
     }
@@ -1294,6 +1377,12 @@ function drawTask() {
         // Embedded coordinates take precedence
         state.waypoints = { ...state.waypoints, ...embeddedWaypoints };
         console.log(`Extracted ${Object.keys(embeddedWaypoints).length} waypoints from task definition`);
+    }
+
+    if (/Ht\s*Pn|Height\s*Pn|Elevated\s*Goal/i.test(text)) {
+        state.elevatedGoalEnabled = true;
+        if (!state.elevatedGoalHeight) state.elevatedGoalHeight = 100;
+        syncElevatedGoalUI();
     }
     
     state.taskLayerGroup = L.featureGroup().addTo(state.map);

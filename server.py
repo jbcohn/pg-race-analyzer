@@ -144,6 +144,7 @@ def parse_task_overall_html(overall_html, fallback_task_name="Task 1", fallback_
     startgate = None
     deadline = None
     race_dist_str = ""
+    elevated_goal_height = None
 
     # Check for explicit Startgate / Deadline text anywhere in the document
     plain_doc = strip_tags(overall_html)
@@ -306,6 +307,10 @@ def parse_task_overall_html(overall_html, fallback_task_name="Task 1", fallback_
 
         # 3. Pilot results table: Rank / # | ID | Name | ... | Start | Finish
         elif ("rank" in header or "#" in header) and "name" in header:
+            # Check for elevated goal / height penalty pattern (Height and Ht Pn columns)
+            if "height" in header and any("ht" in h and "p" in h for h in header):
+                elevated_goal_height = 100
+
             rank_idx = header.index("rank") if "rank" in header else header.index("#")
             id_idx = header.index("id") if "id" in header else -1
             name_idx = header.index("name")
@@ -375,6 +380,7 @@ def parse_task_overall_html(overall_html, fallback_task_name="Task 1", fallback_
         "startgate": startgate,
         "deadline": deadline,
         "turnpoint_count": len(turnpoint_rows),
+        "elevated_goal_height": elevated_goal_height,
     }
 
 
@@ -693,6 +699,8 @@ def import_airtribune_competition(url, comp_name_override=None, force=False, pro
             "timezone_offset": detected_tz if detected_tz is not None else -6,
             "igc_files": igc_rel_files,
         }
+        if parsed_task.get("elevated_goal_height"):
+            task_entry["elevated_goal_height"] = parsed_task["elevated_goal_height"]
         if standings_rel_path:
             task_entry["overall_standings"] = standings_rel_path
 

@@ -7,6 +7,7 @@
       "task_file": "Tasks/SRS Tapalpa 2026/SRS Tapalpa 2026 T1/SRS Tapalpa 2026 T1.txt",
       "waypoint_file": "Tasks/SRS Tapalpa 2026/v2-srs-2026-6.SeeYou.cup",
       "timezone_offset": -6,
+      "elevated_goal_height": 100,
       "igc_files": [
         "Tasks/SRS Tapalpa 2026/SRS Tapalpa 2026 T1/Abel_Varga_0232.igc",
         "Tasks/SRS Tapalpa 2026/SRS Tapalpa 2026 T1/Adolfo_Toledo_1681.igc",
