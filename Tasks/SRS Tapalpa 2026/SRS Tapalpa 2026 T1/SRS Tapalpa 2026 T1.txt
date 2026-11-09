@@ -1,0 +1,14 @@
+Task 1
+2026-11-08
+Race 59.10 Km
+Official Result
+id 		Radius 	Dist. 	Description
+D01 	launch 	400 m 	0.00 Km 	Gravedad Cero
+B41 	SS 	26.0 Km 	2.20 Km 	Paso al Volcan
+B41 		19.0 Km 	9.30 Km 	Paso al Volcan
+A08 		9.0 Km 	22.30 Km 	LZ Piedrotas
+B09 		15.0 Km 	39.30 Km 	Zacolco de Torres
+A10 		5.0 Km 	55.30 Km 	LZ Sayula
+A03 	ES 	200 m 	59.10 Km 	LZ AMACUECA
+A03 	goal 	200 m 	59.10 Km 	LZ AMACUECA
+Startgate: 	12:30:00

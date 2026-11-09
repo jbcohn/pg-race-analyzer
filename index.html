@@ -13,7 +13,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     
     <!-- Custom CSS -->
-    <link rel="stylesheet" href="style.css?v=4.2">
+    <link rel="stylesheet" href="style.css?v=4.3">
 </head>
 <body>
 
@@ -21,16 +21,25 @@
         <!-- Sidebar for Controls and Pilot Stats -->
         <aside class="sidebar">
             <div class="sidebar-header">
-                <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px;">
                     <h1>Race Analyzer</h1>
-                    <button id="btn-open-settings" class="btn-settings-toggle" title="Settings">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-                            <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/>
-                            <path fill-rule="evenodd" d="M19.438 12a7.48 7.48 0 0 0-.05-.823l1.864-1.46c.168-.13.217-.365.111-.55l-1.764-3.056c-.105-.185-.331-.258-.523-.186l-2.197.885c-.456-.35-.96-.642-1.505-.863l-.332-2.34a.439.439 0 0 0-.435-.373H9.414a.439.439 0 0 0-.435.373l-.332 2.34c-.545.22-1.049.513-1.505.863l-2.197-.885a.442.442 0 0 0-.523.186L2.658 9.167c-.106.185-.057.42.111.55l1.864 1.46c-.035.27-.05.544-.05.823s.015.553.05.823l-1.864 1.46c-.168.13-.217.365-.111.55l1.764 3.056c.105.185.331.258.523.186l2.197-.885c.456.35.96.642 1.505.863l.332 2.34c.045.318.318.557.64.557h3.528c.322 0 .595-.239.64-.557l.332-2.34c.545-.22 1.049-.513 1.505-.863l2.197.885a.442.442 0 0 0 .523-.186l1.764-3.056c.106-.185.057-.42-.111-.55l-1.864-1.46c.035-.27.05-.544.05-.823Zm-1.5-.028a.5.5 0 0 1 .238.419c.005.105.008.209.008.312a5.975 5.975 0 0 1-.413 2.188.5.5 0 0 1-.453.308l-2.09-.088a.5.5 0 0 1-.41-.283 4.469 4.469 0 0 0-1.127-1.127.5.5 0 0 1-.283-.41l-.088-2.09a.5.5 0 0 1 .308-.453 5.975 5.975 0 0 1 2.188-.413c.103 0 .207.003.312.008a.5.5 0 0 1 .419.238l1.096 1.792Zm-11.876 0a.5.5 0 0 0-.238.419c-.005.105-.008.209-.008.312a5.975 5.975 0 0 0 .413 2.188.5.5 0 0 0 .453.308l2.09-.088c.18-.008.342.103.41.283a4.469 4.469 0 0 0 1.127 1.127.5.5 0 0 0 .283.41l.088 2.09a.5.5 0 0 0 .308.453 5.975 5.975 0 0 0 2.188.413c.103 0 .207-.003.312-.008a.5.5 0 0 0 .419-.238l1.096-1.792a.5.5 0 0 0-.238-.419c-.105-.005-.209-.008-.312-.008a5.975 5.975 0 0 0-2.188.413.5.5 0 0 0-.453.308l-.088 2.09a.5.5 0 0 0-.283.41 4.469 4.469 0 0 1-1.127-1.127.5.5 0 0 0-.41-.283l-2.09-.088a.5.5 0 0 0-.453-.308 5.975 5.975 0 0 0-.413-2.188c0-.103.003-.207.008-.312a.5.5 0 0 0-.238-.419l-1.792-1.096Z" clip-rule="evenodd"/>
-                        </svg>
-                    </button>
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                        <button id="btn-open-add-race" class="btn-primary" style="padding: 6px 10px; font-size: 0.78rem; border-radius: 6px; display: flex; align-items: center; gap: 4px;" title="Import race results from Airtribune or upload files">
+                            + Add Race
+                        </button>
+                        <button id="btn-open-settings" class="btn-settings-toggle" title="Settings">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                                <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/>
+                                <path fill-rule="evenodd" d="M19.438 12a7.48 7.48 0 0 0-.05-.823l1.864-1.46c.168-.13.217-.365.111-.55l-1.764-3.056c-.105-.185-.331-.258-.523-.186l-2.197.885c-.456-.35-.96-.642-1.505-.863l-.332-2.34a.439.439 0 0 0-.435-.373H9.414a.439.439 0 0 0-.435.373l-.332 2.34c-.545.22-1.049.513-1.505.863l-2.197-.885a.442.442 0 0 0-.523.186L2.658 9.167c-.106.185-.057.42.111.55l1.864 1.46c-.035.27-.05.544-.05.823s.015.553.05.823l-1.864 1.46c-.168.13-.217.365-.111.55l1.764 3.056c.105.185.331.258.523.186l2.197-.885c.456.35.96.642 1.505.863l.332 2.34c.045.318.318.557.64.557h3.528c.322 0 .595-.239.64-.557l.332-2.34c.545-.22 1.049-.513 1.505-.863l2.197.885a.442.442 0 0 0 .523-.186l1.764-3.056c.106-.185.057-.42-.111-.55l-1.864-1.46c.035-.27.05-.544.05-.823Zm-1.5-.028a.5.5 0 0 1 .238.419c.005.105.008.209.008.312a5.975 5.975 0 0 1-.413 2.188.5.5 0 0 1-.453.308l-2.09-.088a.5.5 0 0 1-.41-.283 4.469 4.469 0 0 0-1.127-1.127.5.5 0 0 1-.283-.41l-.088-2.09a.5.5 0 0 1 .308-.453 5.975 5.975 0 0 1 2.188-.413c.103 0 .207.003.312.008a.5.5 0 0 1 .419.238l1.096 1.792Zm-11.876 0a.5.5 0 0 0-.238.419c-.005.105-.008.209-.008.312a5.975 5.975 0 0 0 .413 2.188.5.5 0 0 0 .453.308l2.09-.088c.18-.008.342.103.41.283a4.469 4.469 0 0 0 1.127 1.127.5.5 0 0 0 .283.41l.088 2.09a.5.5 0 0 0 .308.453 5.975 5.975 0 0 0 2.188.413c.103 0 .207-.003.312-.008a.5.5 0 0 0 .419-.238l1.096-1.792a.5.5 0 0 0-.238-.419c-.105-.005-.209-.008-.312-.008a5.975 5.975 0 0 0-2.188.413.5.5 0 0 0-.453.308l-.088 2.09a.5.5 0 0 0-.283.41 4.469 4.469 0 0 1-1.127-1.127.5.5 0 0 0-.41-.283l-2.09-.088a.5.5 0 0 0-.453-.308 5.975 5.975 0 0 0-.413-2.188c0-.103.003-.207.008-.312a.5.5 0 0 0-.238-.419l-1.792-1.096Z" clip-rule="evenodd"/>
+                            </svg>
+                        </button>
+                    </div>
                 </div>
-                <p>Upload IGC files to compare pilots.</p>
+                <div style="display: flex; align-items: center; gap: 8px; margin-top: 8px;">
+                    <select id="sidebar-task-select" style="flex: 1; background: var(--bg-card); color: var(--text-main); border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; font-size: 0.8rem; cursor: pointer;">
+                        <option value="">-- Select Race Task --</option>
+                    </select>
+                </div>
                 <div id="active-task-title" class="active-task-title">No Task Active</div>
             </div>
 
@@ -303,8 +312,8 @@
                     <h3>Track Management</h3>
                     <div class="upload-controls" style="display: flex; gap: 8px;">
                         <label class="btn-primary" for="file-upload" style="flex: 1; text-align: center; margin-bottom: 0; display: flex; align-items: center; justify-content: center; cursor: pointer;">
-                            Upload Tracks (.igc)
-                            <input type="file" id="file-upload" accept=".igc,.gpx,.kml" multiple style="display: none;">
+                            Upload Tracks (.igc / .zip)
+                            <input type="file" id="file-upload" accept=".igc,.gpx,.kml,.zip" multiple style="display: none;">
                         </label>
                         <button id="btn-clear-tracks" class="btn-secondary danger" style="flex: 1;">Clear Tracks</button>
                     </div>
@@ -312,7 +321,12 @@
 
                 <!-- Task Definition -->
                 <div class="settings-section">
-                    <h3>Task Definition</h3>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                        <h3 style="margin-bottom: 0;">Task Definition</h3>
+                        <button id="btn-settings-open-import" class="btn-primary" style="padding: 4px 10px; font-size: 0.75rem; border-radius: 4px;">
+                            ⚡ Import from Airtribune
+                        </button>
+                    </div>
                     <div class="task-presets-row" id="task-presets-container" style="margin-bottom: 8px; display: none;">
                         <label for="task-select" style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 4px; display: block;">Select Predefined Task:</label>
                         <select id="task-select" style="width: 100%; background: var(--bg-card); color: var(--text-main); border: 1px solid var(--border); border-radius: 4px; padding: 6px; font-size: 0.8rem; margin-bottom: 8px;">
@@ -327,7 +341,7 @@
                         </label>
                     </div>
                     
-                    <textarea id="task-textarea" placeholder="Paste task table here..." rows="5" style="width: 100%; background: var(--bg-card); color: var(--text-main); border: 1px solid var(--border); border-radius: 4px; padding: 8px; margin-bottom: 8px; font-family: monospace; font-size: 0.75rem; resize: vertical;">id 		Radius 	Dist. 	Description
+                    <textarea id="task-textarea" placeholder="Paste task table here (supports FS or AirScore / Airtribune OVERALL tables)..." rows="5" style="width: 100%; background: var(--bg-card); color: var(--text-main); border: 1px solid var(--border); border-radius: 4px; padding: 8px; margin-bottom: 8px; font-family: monospace; font-size: 0.75rem; resize: vertical;">id 		Radius 	Dist. 	Description
 LAUNCH 	launch 	400 m   		LAUNCH
 LAUNCH 	SS 	10.0 Km 	10.00 Km 	LAUNCH
 BADGRN 		3.0 Km 	26.17 Km 	BADGRN
@@ -424,6 +438,79 @@ Deadline: 	19:00:00</textarea>
         </div>
     </div>
 
+    <!-- Add Race / Airtribune Import Modal -->
+    <div id="add-race-modal" class="modal-overlay hidden">
+        <div class="modal-content" style="max-width: 560px;">
+            <div class="modal-header">
+                <h2>Add Race Results</h2>
+                <button id="btn-close-add-race" class="btn-close-modal" title="Close">×</button>
+            </div>
+            
+            <div class="modal-body">
+                <!-- Automated Airtribune Import -->
+                <div class="settings-section">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                        <h3 style="margin-bottom: 0;">⚡ Automatic Airtribune Import</h3>
+                        <button type="button" id="btn-preset-srs-tapalpa" class="btn-secondary" style="padding: 3px 8px; font-size: 0.72rem; border-radius: 4px;" title="Fill SRS Tapalpa 2026 URL">
+                            🇲🇽 SRS Tapalpa 2026
+                        </button>
+                    </div>
+                    <p style="font-size: 0.78rem; color: var(--text-muted); margin-bottom: 10px; line-height: 1.4;">
+                        Paste an Airtribune competition or task URL to automatically download the <code>.cup</code> waypoints, parse the <code>OVERALL</code> task table &amp; standings, extract the <code>.zip</code> IGC tracklogs into <code>Tasks/</code>, and add to <code>manifest.json</code>.
+                    </p>
+                    
+                    <div style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px;">
+                        <div>
+                            <label for="input-airtribune-url" style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-bottom: 4px;">Airtribune Event or Task URL</label>
+                            <input type="url" id="input-airtribune-url" value="https://airtribune.com/srs-2026-6" placeholder="https://airtribune.com/srs-2026-6 or .../results/task6989/day/overall" style="width: 100%; padding: 8px; border-radius: 6px; background: var(--bg-card); color: var(--text-main); border: 1px solid var(--border); font-size: 0.82rem;">
+                        </div>
+                        <div style="display: flex; gap: 8px; align-items: flex-end;">
+                            <div style="flex: 1;">
+                                <label for="input-airtribune-comp" style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-bottom: 4px;">Competition Name (in Tasks/)</label>
+                                <input type="text" id="input-airtribune-comp" value="SRS Tapalpa 2026" placeholder="Auto-detect (e.g. SRS Tapalpa 2026)" style="width: 100%; padding: 8px; border-radius: 6px; background: var(--bg-card); color: var(--text-main); border: 1px solid var(--border); font-size: 0.82rem;">
+                            </div>
+                            <label style="font-size: 0.75rem; color: var(--text-muted); display: flex; align-items: center; gap: 6px; padding-bottom: 8px; cursor: pointer; white-space: nowrap;">
+                                <input type="checkbox" id="chk-airtribune-force" style="margin: 0; cursor: pointer;">
+                                Re-download
+                            </label>
+                        </div>
+                    </div>
+
+                    <button id="btn-import-airtribune" class="btn-primary" style="width: 100%; padding: 10px; font-size: 0.85rem;">
+                        ⚡ Fetch &amp; Save Race to Tasks
+                    </button>
+
+                    <div id="airtribune-import-status" style="display: none; margin-top: 10px; padding: 10px; border-radius: 6px; background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border); font-size: 0.78rem; line-height: 1.4;"></div>
+                </div>
+
+                <!-- Manual Step-by-Step Upload -->
+                <div class="settings-section" style="margin-bottom: 0;">
+                    <h3>📁 Manual Upload (Waypoints + Task + IGC Zip/Files)</h3>
+                    <p style="font-size: 0.76rem; color: var(--text-muted); margin-bottom: 10px; line-height: 1.4;">
+                        Or upload files downloaded from Airtribune manually:
+                    </p>
+                    <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+                        <label class="btn-secondary" for="wpt-upload" style="flex: 1; text-align: center; cursor: pointer; font-size: 0.8rem; padding: 8px;">
+                            1. Waypoints (.cup/.wpt)
+                        </label>
+                        <label class="btn-primary" for="file-upload" style="flex: 1; text-align: center; cursor: pointer; font-size: 0.8rem; padding: 8px;">
+                            2. Tracks (.zip / .igc)
+                        </label>
+                    </div>
+                    <div style="margin-bottom: 8px;">
+                        <label for="manual-task-textarea" style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-bottom: 4px;">
+                            3. Task Table (paste directly from Airtribune <code>OVERALL</code> page) &amp; Startgate:
+                        </label>
+                        <textarea id="manual-task-textarea" rows="5" placeholder="Paste task table here (e.g. Order Check Radius SS/ES Distance Name Description...) and optional Startgate: 12:30:00" style="width: 100%; background: var(--bg-card); color: var(--text-main); border: 1px solid var(--border); border-radius: 6px; padding: 8px; font-family: monospace; font-size: 0.75rem; resize: vertical;"></textarea>
+                    </div>
+                    <div style="display: flex; gap: 8px;">
+                        <button id="btn-manual-draw-task" class="btn-secondary" style="flex: 1;">Apply &amp; Draw Task</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Full-screen Photo Loading Overlay -->
     <div id="track-loader" class="track-loader hidden">
         <div class="track-loader-card">
@@ -452,7 +539,7 @@ Deadline: 	19:00:00</textarea>
     <script type="module" src="shared/parsers.js"></script>
     <script type="module" src="shared/waypoint-parsers.js"></script>
     <script type="module" src="shared/tactics.js"></script>
-    <script type="module" src="side-view.js"></script>
-    <script type="module" src="main.js?v=4.2"></script>
+    <script type="module" src="side-view.js?v=4.4"></script>
+    <script type="module" src="main.js?v=4.5"></script>
 </body>
 </html>

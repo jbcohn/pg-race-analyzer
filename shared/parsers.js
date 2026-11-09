@@ -1,6 +1,23 @@
 // shared/parsers.js
 import { vincentyDistance } from './geo-math.js';
 
+export function extractIGCPilotName(text) {
+    if (!text) return null;
+    const lines = text.split(/\r?\n/, 40);
+    for (let line of lines) {
+        line = line.trim();
+        if (line.startsWith('B')) break;
+        const m = line.match(/^H[FOP]PLT(?:PILOT(?:INCHARGE)?)?\s*:\s*(.+)$/i);
+        if (m && m[1]) {
+            const name = m[1].trim();
+            if (name && name.toUpperCase() !== 'NA') {
+                return name;
+            }
+        }
+    }
+    return null;
+}
+
 export function parseIGC(text) {
     const points = [];
     const lines = text.split(/\r?\n/);

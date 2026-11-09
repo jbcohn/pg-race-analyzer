@@ -6,3 +6,5 @@ dist/
 .vscode/
 *.zip
 *.code-workspace
+__pycache__/
+*.pyc

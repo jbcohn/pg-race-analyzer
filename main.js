@@ -1,10 +1,10 @@
-import { parseIGC, parseGPX, parseKML, ensureTimestamps } from './shared/parsers.js';
+import { parseIGC, parseGPX, parseKML, ensureTimestamps, extractIGCPilotName } from './shared/parsers.js';
 import { haversineDistance, bearing } from './shared/geo-math.js';
 import { parseWaypointFile, parseTaskCoordinates } from './shared/waypoint-parsers.js';
 import { analyzeTactics, calculateRemainingLegs, getOptimizedTaskDistances } from './shared/tactics.js';
 import { calculateLeadingPoints, calculateTimePoints, calculateDistancePoints, integratePgWeightCurve } from './shared/scoring.js';
 import { initAudio, playCoinSound } from './shared/audio.js';
-import { SideView } from './side-view.js';
+import { SideView } from './side-view.js?v=4.4';
 
 /**
  * Encode a relative file path for use in fetch() URLs.
@@ -281,6 +281,9 @@ function initApp() {
     });
 
     sideView = new SideView('side-view-container', 'side-view-canvas');
+    sideView.onPilotHover = (track) => {
+        setHoveredPilot(track, 'sideview');
+    };
     document.getElementById('btn-reset-side-view').addEventListener('click', () => {
         if (sideView) sideView.resetZoom();
     });
@@ -306,6 +309,7 @@ function initApp() {
     // UI Resizer & Toggle
     setupSidebarControls();
     initSettingsMenu();
+    initAddRaceModal();
     
     // Sort and persistent sorting option
     document.getElementById('pilot-sort-select').addEventListener('change', (e) => {
@@ -568,8 +572,258 @@ async function loadOverallStandingsForTask(taskId, customPath) {
     }
 }
 
-function setupPredefinedTasks() {
-    fetch(cacheBustUrl('Tasks/manifest.json'))
+let currentManifestTasks = [];
+let predefinedTaskListenerAttached = false;
+
+async function loadPredefinedTaskById(val) {
+    if (!val) return;
+    const taskInfo = currentManifestTasks.find(t => t.id === val);
+    if (!taskInfo) return;
+
+    const select = document.getElementById('task-select');
+    const sidebarSelect = document.getElementById('sidebar-task-select');
+    if (select) select.value = val;
+    if (sidebarSelect) sidebarSelect.value = val;
+
+    state.activeTaskName = taskInfo.name;
+    state.taskTimezoneOffset = taskInfo.timezone_offset !== undefined ? taskInfo.timezone_offset : 'auto';
+    const taskTitleEl = document.getElementById('active-task-title');
+    if (taskTitleEl) {
+        taskTitleEl.textContent = taskInfo.name;
+        taskTitleEl.style.display = 'block';
+    }
+
+    // Close modals immediately so user can see progress
+    const modal = document.getElementById('settings-modal');
+    if (modal) modal.classList.add('hidden');
+    const addRaceModal = document.getElementById('add-race-modal');
+    if (addRaceModal) addRaceModal.classList.add('hidden');
+
+    const loaderEl = document.getElementById('track-loader');
+    const loaderTextEl = document.getElementById('track-loader-text');
+    const loaderBarEl = document.getElementById('loader-bar-fill');
+
+    if (loaderEl) {
+        loaderEl.classList.remove('hidden');
+        if (loaderTextEl) loaderTextEl.textContent = 'Loading task preset...';
+        if (loaderBarEl) loaderBarEl.style.width = '0%';
+    }
+
+    try {
+        if (select) select.disabled = true;
+        if (sidebarSelect) sidebarSelect.disabled = true;
+
+        // Stop playback if playing
+        if (state.isPlaying) {
+            togglePlayback();
+        }
+
+        // Load corresponding overall standings
+        await loadOverallStandingsForTask(taskInfo.id, taskInfo.overall_standings);
+
+        // Remove all track layers from the map
+        state.tracks.forEach(t => {
+            if (state.map && t.layerGroup) {
+                state.map.removeLayer(t.layerGroup);
+            }
+        });
+
+        // Clear tracks state
+        state.tracks = [];
+        state.minTime = Infinity;
+        state.maxTime = -Infinity;
+        state.currentTime = 0;
+
+        // Reset scrubber and time display
+        const scrubber = document.getElementById('timeline-scrubber');
+        if (scrubber) {
+            scrubber.value = 0;
+            scrubber.disabled = true;
+        }
+        const timeDisplay = document.getElementById('time-display');
+        if (timeDisplay) timeDisplay.textContent = '--:--:--';
+
+        // Clear IndexedDB tracks
+        const db = await getDB();
+        if (db) {
+            const tx = db.transaction(STORE_NAME, 'readwrite');
+            tx.objectStore(STORE_NAME).clear();
+            await new Promise((resolve, reject) => {
+                tx.oncomplete = () => resolve();
+                tx.onerror = (e) => reject(tx.error || e.target.error);
+            });
+        }
+        try { localStorage.removeItem('pg-tracks'); } catch(err) {}
+
+        // Clear waypoints state and cache
+        state.waypoints = {};
+        try { localStorage.removeItem('pg-waypoints'); } catch(err) {}
+
+        // Reset waypoint upload label
+        const wptLabel = document.querySelector('label[for="wpt-upload"]');
+        if (wptLabel) {
+            for (let node of wptLabel.childNodes) {
+                if (node.nodeType === Node.TEXT_NODE && node.textContent.trim().length > 0) {
+                    node.textContent = ' Upload Waypoints (.wpt/.cup) ';
+                    break;
+                }
+            }
+        }
+
+        // Reset file inputs
+        const fileUploadInput = document.getElementById('file-upload');
+        if (fileUploadInput) fileUploadInput.value = '';
+        const wptUploadInput = document.getElementById('wpt-upload');
+        if (wptUploadInput) wptUploadInput.value = '';
+
+        // Clear existing task representation on map and state
+        if (state.taskLayerGroup) {
+            state.map.removeLayer(state.taskLayerGroup);
+            state.taskLayerGroup = null;
+        }
+        state.task = [];
+        state.optimizedTask = null;
+        state.terrainProfile = null;
+        state.startGateTime = null;
+        state.startGateTimeStr = null;
+        state.deadlineTime = null;
+        state.deadlineTimeStr = null;
+
+        const gateInfoEl = document.getElementById('task-gate-info');
+        if (gateInfoEl) {
+            gateInfoEl.innerHTML = '';
+        }
+
+        // Clear task text
+        document.getElementById('task-textarea').value = '';
+        try { localStorage.removeItem('pg-task-text'); } catch(err) {}
+
+        // Clear Lift/Sink overlay
+        if (state.liftSinkLayerGroup) {
+            state.liftSinkLayerGroup.clearLayers();
+        }
+
+        // Render empty state immediately
+        if (sideView) sideView.render(state);
+        updatePilotListUI();
+
+        // 1. Load waypoints
+        const wptFile = taskInfo.waypoint_file;
+        if (wptFile) {
+            if (loaderTextEl) loaderTextEl.textContent = 'Loading waypoints...';
+            const wptRes = await fetch(cacheBustUrl(wptFile));
+            const wptText = await wptRes.text();
+            const newWpts = parseWaypointFile(wptText, wptFile);
+            Object.assign(state.waypoints, newWpts);
+            try { localStorage.setItem('pg-waypoints', JSON.stringify(state.waypoints)); } catch(err) {}
+        }
+
+        // 2. Load task definition
+        if (taskInfo.task_file) {
+            if (loaderTextEl) loaderTextEl.textContent = 'Loading task definition...';
+            const taskRes = await fetch(cacheBustUrl(taskInfo.task_file));
+            const taskText = await taskRes.text();
+            document.getElementById('task-textarea').value = taskText;
+            const manualTextarea = document.getElementById('manual-task-textarea');
+            if (manualTextarea) manualTextarea.value = taskText;
+            try { localStorage.setItem('pg-task-text', taskText); } catch(err) {}
+            drawTask();
+        }
+
+        // 4. Fetch and load the track logs in parallel with concurrency limit of 6
+        const igcFiles = taskInfo.igc_files || [];
+        const total = igcFiles.length;
+        let loadedCount = 0;
+
+        async function fetchAndAddTrack(url) {
+            const filename = url.substring(url.lastIndexOf('/') + 1);
+            const cleanName = formatPilotName(filename);
+            if (loaderTextEl) loaderTextEl.textContent = `Fetching ${cleanName}...`;
+
+            const trackRes = await fetch(cacheBustUrl(url));
+            const text = await trackRes.text();
+            const trackPoints = parseIGC(text);
+            if (!trackPoints || trackPoints.length === 0) return;
+
+            let displayFilename = filename;
+            if (!/[a-zA-Z]/.test(filename.replace(/\.(igc|gpx|kml)$/i, ''))) {
+                const hdrPilot = extractIGCPilotName(text);
+                if (hdrPilot) displayFilename = `${hdrPilot}.igc`;
+            }
+
+            const points = ensureTimestamps(trackPoints, state.taskTimezoneOffset !== undefined ? state.taskTimezoneOffset : 'auto');
+            addTrackToState(displayFilename, points);
+
+            loadedCount++;
+            const pct = Math.round((loadedCount / total) * 100);
+            if (loaderBarEl) loaderBarEl.style.width = `${pct}%`;
+            if (loaderTextEl) loaderTextEl.textContent = `Loading tracks (${loadedCount}/${total})...`;
+        }
+
+        const concurrency = 6;
+        const queue = [...igcFiles];
+
+        async function worker() {
+            while (queue.length > 0) {
+                const url = queue.shift();
+                try {
+                    await fetchAndAddTrack(url);
+                } catch (err) {
+                    console.error(`Error loading track file ${url}:`, err);
+                }
+            }
+        }
+
+        const workers = [];
+        for (let i = 0; i < Math.min(concurrency, queue.length); i++) {
+            workers.push(worker());
+        }
+
+        await Promise.all(workers);
+
+        if (loaderBarEl) loaderBarEl.style.width = '100%';
+        if (loaderTextEl) loaderTextEl.textContent = 'All preset tracks loaded!';
+        await new Promise(resolve => setTimeout(resolve, 300));
+
+        // Trigger UI updates
+        onAllFilesLoaded();
+
+    } catch (err) {
+        console.error('Failed to load task preset:', err);
+        alert('Error loading task preset: ' + err.message);
+    } finally {
+        if (select) select.disabled = false;
+        if (sidebarSelect) sidebarSelect.disabled = false;
+        if (loaderEl) loaderEl.classList.add('hidden');
+    }
+}
+
+function populateTaskSelectElement(selectEl, tasks, placeholderText) {
+    if (!selectEl) return;
+    const prevValue = selectEl.value;
+    selectEl.innerHTML = `<option value="">${placeholderText}</option>`;
+    let currentGroup = null;
+    let currentComp = null;
+    tasks.forEach(task => {
+        const compName = task.comp || 'Other Tasks';
+        if (compName !== currentComp) {
+            currentComp = compName;
+            currentGroup = document.createElement('optgroup');
+            currentGroup.label = currentComp;
+            selectEl.appendChild(currentGroup);
+        }
+        const opt = document.createElement('option');
+        opt.value = task.id;
+        opt.textContent = task.name;
+        (currentGroup || selectEl).appendChild(opt);
+    });
+    if (prevValue && tasks.some(t => t.id === prevValue)) {
+        selectEl.value = prevValue;
+    }
+}
+
+function setupPredefinedTasks(autoSelectTaskId = null) {
+    return fetch(cacheBustUrl('Tasks/manifest.json'))
         .then(res => {
             if (!res.ok) {
                 return fetch(cacheBustUrl('manifest.json')).then(r => {
@@ -579,242 +833,31 @@ function setupPredefinedTasks() {
             }
             return res.json();
         })
-        .then(manifest => {
+        .then(async manifest => {
+            currentManifestTasks = manifest.tasks || [];
             const container = document.getElementById('task-presets-container');
             const select = document.getElementById('task-select');
-            if (!container || !select) return;
-            
-            // Clear default and populate options grouped by comp
-            select.innerHTML = '<option value="">-- Select Task --</option>';
-            let currentGroup = null;
-            let currentComp = null;
-            manifest.tasks.forEach(task => {
-                const compName = task.comp || 'Other Tasks';
-                if (compName !== currentComp) {
-                    currentComp = compName;
-                    currentGroup = document.createElement('optgroup');
-                    currentGroup.label = currentComp;
-                    select.appendChild(currentGroup);
-                }
-                const opt = document.createElement('option');
-                opt.value = task.id;
-                opt.textContent = task.name;
-                (currentGroup || select).appendChild(opt);
-            });
-            
-            container.style.display = 'block';
-            console.log(`Loaded ${manifest.tasks.length} predefined tasks into selector.`);
-            
-            select.addEventListener('change', async (e) => {
-                const val = e.target.value;
-                if (!val) return;
-                
-                const taskInfo = manifest.tasks.find(t => t.id === val);
-                if (!taskInfo) return;
-                
-                state.activeTaskName = taskInfo.name;
-                state.taskTimezoneOffset = taskInfo.timezone_offset !== undefined ? taskInfo.timezone_offset : 'auto';
-                const taskTitleEl = document.getElementById('active-task-title');
-                if (taskTitleEl) {
-                    taskTitleEl.textContent = taskInfo.name;
-                    taskTitleEl.style.display = 'block';
-                }
-                
-                // Close settings modal immediately so user can see progress
-                const modal = document.getElementById('settings-modal');
-                if (modal) modal.classList.add('hidden');
-                
-                const loaderEl = document.getElementById('track-loader');
-                const loaderTextEl = document.getElementById('track-loader-text');
-                const loaderBarEl = document.getElementById('loader-bar-fill');
-                
-                if (loaderEl) {
-                    loaderEl.classList.remove('hidden');
-                    if (loaderTextEl) loaderTextEl.textContent = 'Loading task preset...';
-                    if (loaderBarEl) loaderBarEl.style.width = '0%';
-                }
-                
-                try {
-                    select.disabled = true;
-                    
-                    // Stop playback if playing
-                    if (state.isPlaying) {
-                        togglePlayback();
-                    }
+            const sidebarSelect = document.getElementById('sidebar-task-select');
 
-                    // Load corresponding overall standings
-                    await loadOverallStandingsForTask(taskInfo.id, taskInfo.overall_standings);
-                    
-                    // Remove all track layers from the map
-                    state.tracks.forEach(t => {
-                        if (state.map && t.layerGroup) {
-                            state.map.removeLayer(t.layerGroup);
-                        }
-                    });
-                    
-                    // Clear tracks state
-                    state.tracks = [];
-                    state.minTime = Infinity;
-                    state.maxTime = -Infinity;
-                    state.currentTime = 0;
-                    
-                    // Reset scrubber and time display
-                    const scrubber = document.getElementById('timeline-scrubber');
-                    if (scrubber) {
-                        scrubber.value = 0;
-                        scrubber.disabled = true;
-                    }
-                    const timeDisplay = document.getElementById('time-display');
-                    if (timeDisplay) timeDisplay.textContent = '--:--:--';
-                    
-                    // Clear IndexedDB tracks
-                    const db = await getDB();
-                    if (db) {
-                        const tx = db.transaction(STORE_NAME, 'readwrite');
-                        tx.objectStore(STORE_NAME).clear();
-                        await new Promise((resolve, reject) => {
-                            tx.oncomplete = () => resolve();
-                            tx.onerror = (e) => reject(tx.error || e.target.error);
-                        });
-                    }
-                    try { localStorage.removeItem('pg-tracks'); } catch(err) {}
-                    
-                    // Clear waypoints state and cache
-                    state.waypoints = {};
-                    try { localStorage.removeItem('pg-waypoints'); } catch(err) {}
-                    
-                    // Reset waypoint upload label
-                    const wptLabel = document.querySelector('label[for="wpt-upload"]');
-                    if (wptLabel) {
-                        for (let node of wptLabel.childNodes) {
-                            if (node.nodeType === Node.TEXT_NODE && node.textContent.trim().length > 0) {
-                                node.textContent = ' Upload Waypoints (.wpt/.cup) ';
-                                break;
-                            }
-                        }
-                    }
-                    
-                    // Reset file inputs
-                    const fileUploadInput = document.getElementById('file-upload');
-                    if (fileUploadInput) fileUploadInput.value = '';
-                    const wptUploadInput = document.getElementById('wpt-upload');
-                    if (wptUploadInput) wptUploadInput.value = '';
-                    
-                    // Clear existing task representation on map and state
-                    if (state.taskLayerGroup) {
-                        state.map.removeLayer(state.taskLayerGroup);
-                        state.taskLayerGroup = null;
-                    }
-                    state.task = [];
-                    state.optimizedTask = null;
-                    state.terrainProfile = null;
-                    state.startGateTime = null;
-                    state.startGateTimeStr = null;
-                    state.deadlineTime = null;
-                    state.deadlineTimeStr = null;
-                    
-                    const gateInfoEl = document.getElementById('task-gate-info');
-                    if (gateInfoEl) {
-                        gateInfoEl.innerHTML = '';
-                    }
-                    
-                    // Clear task text
-                    document.getElementById('task-textarea').value = '';
-                    try { localStorage.removeItem('pg-task-text'); } catch(err) {}
-                    
-                    // Clear Lift/Sink overlay
-                    if (state.liftSinkLayerGroup) {
-                        state.liftSinkLayerGroup.clearLayers();
-                    }
-                    
-                    // Render empty state immediately
-                    if (sideView) sideView.render(state);
-                    updatePilotListUI();
-                    
-                    // 1. Load waypoints
-                    const wptFile = taskInfo.waypoint_file || manifest.waypoint_file;
-                    if (wptFile) {
-                        if (loaderTextEl) loaderTextEl.textContent = 'Loading waypoints...';
-                        const wptRes = await fetch(cacheBustUrl(wptFile));
-                        const wptText = await wptRes.text();
-                        const newWpts = parseWaypointFile(wptText, wptFile);
-                        Object.assign(state.waypoints, newWpts);
-                        try { localStorage.setItem('pg-waypoints', JSON.stringify(state.waypoints)); } catch(err) {}
-                    }
-                    
-                    // 2. Load task definition
-                    if (taskInfo.task_file) {
-                        if (loaderTextEl) loaderTextEl.textContent = 'Loading task definition...';
-                        const taskRes = await fetch(cacheBustUrl(taskInfo.task_file));
-                        const taskText = await taskRes.text();
-                        document.getElementById('task-textarea').value = taskText;
-                        try { localStorage.setItem('pg-task-text', taskText); } catch(err) {}
-                        drawTask();
-                    }
-                    
-                    // 3. Clear existing tracks (Done at start)
-                    
-                    // 4. Fetch and load the track logs in parallel with concurrency limit of 6
-                    const igcFiles = taskInfo.igc_files;
-                    const total = igcFiles.length;
-                    let loadedCount = 0;
-                    
-                    async function fetchAndAddTrack(url) {
-                        const filename = url.substring(url.lastIndexOf('/') + 1);
-                        const cleanName = formatPilotName(filename);
-                        if (loaderTextEl) loaderTextEl.textContent = `Fetching ${cleanName}...`;
-                        
-                        const trackRes = await fetch(cacheBustUrl(url));
-                        const text = await trackRes.text();
-                        const trackPoints = parseIGC(text);
-                        if (!trackPoints || trackPoints.length === 0) return;
-                        
-                        // Add track to state
-                        const points = ensureTimestamps(trackPoints, state.taskTimezoneOffset !== undefined ? state.taskTimezoneOffset : 'auto');
-                        addTrackToState(filename, points);
-                        
-                        loadedCount++;
-                        const pct = Math.round((loadedCount / total) * 100);
-                        if (loaderBarEl) loaderBarEl.style.width = `${pct}%`;
-                        if (loaderTextEl) loaderTextEl.textContent = `Loading tracks (${loadedCount}/${total})...`;
-                    }
-                    
-                    const concurrency = 6;
-                    const queue = [...igcFiles];
-                    
-                    async function worker() {
-                        while (queue.length > 0) {
-                            const url = queue.shift();
-                            try {
-                                await fetchAndAddTrack(url);
-                            } catch (err) {
-                                console.error(`Error loading track file ${url}:`, err);
-                            }
-                        }
-                    }
-                    
-                    const workers = [];
-                    for (let i = 0; i < Math.min(concurrency, queue.length); i++) {
-                        workers.push(worker());
-                    }
-                    
-                    await Promise.all(workers);
-                    
-                    if (loaderBarEl) loaderBarEl.style.width = '100%';
-                    if (loaderTextEl) loaderTextEl.textContent = 'All preset tracks loaded!';
-                    await new Promise(resolve => setTimeout(resolve, 300));
-                    
-                    // Trigger UI updates
-                    onAllFilesLoaded();
-                    
-                } catch (err) {
-                    console.error('Failed to load task preset:', err);
-                    alert('Error loading task preset: ' + err.message);
-                } finally {
-                    select.disabled = false;
-                    if (loaderEl) loaderEl.classList.add('hidden');
+            populateTaskSelectElement(select, currentManifestTasks, '-- Select Task --');
+            populateTaskSelectElement(sidebarSelect, currentManifestTasks, '-- Select Race Task --');
+
+            if (container) container.style.display = 'block';
+            console.log(`Loaded ${currentManifestTasks.length} predefined tasks into selector.`);
+
+            if (!predefinedTaskListenerAttached) {
+                predefinedTaskListenerAttached = true;
+                if (select) {
+                    select.addEventListener('change', (e) => loadPredefinedTaskById(e.target.value));
                 }
-            });
+                if (sidebarSelect) {
+                    sidebarSelect.addEventListener('change', (e) => loadPredefinedTaskById(e.target.value));
+                }
+            }
+
+            if (autoSelectTaskId) {
+                await loadPredefinedTaskById(autoSelectTaskId);
+            }
         })
         .catch(err => {
             console.log('Predefined tasks manifest not available or failed to load:', err);
@@ -823,9 +866,9 @@ function setupPredefinedTasks() {
 
 function resetPredefinedTaskSelect() {
     const select = document.getElementById('task-select');
-    if (select) {
-        select.value = '';
-    }
+    if (select) select.value = '';
+    const sidebarSelect = document.getElementById('sidebar-task-select');
+    if (sidebarSelect) sidebarSelect.value = '';
 }
 
 function setupSidebarControls() {
@@ -1045,6 +1088,140 @@ function initSettingsMenu() {
     }
 }
 
+function initAddRaceModal() {
+    const addRaceModal = document.getElementById('add-race-modal');
+    const settingsModal = document.getElementById('settings-modal');
+    const openBtn = document.getElementById('btn-open-add-race');
+    const settingsOpenBtn = document.getElementById('btn-settings-open-import');
+    const closeBtn = document.getElementById('btn-close-add-race');
+    const presetSrsBtn = document.getElementById('btn-preset-srs-tapalpa');
+    const importBtn = document.getElementById('btn-import-airtribune');
+    const urlInput = document.getElementById('input-airtribune-url');
+    const compInput = document.getElementById('input-airtribune-comp');
+    const forceChk = document.getElementById('chk-airtribune-force');
+    const statusBox = document.getElementById('airtribune-import-status');
+    const manualTaskTextarea = document.getElementById('manual-task-textarea');
+    const mainTaskTextarea = document.getElementById('task-textarea');
+    const manualDrawBtn = document.getElementById('btn-manual-draw-task');
+
+    function openAddRace() {
+        if (settingsModal) settingsModal.classList.add('hidden');
+        if (addRaceModal) addRaceModal.classList.remove('hidden');
+        if (manualTaskTextarea && mainTaskTextarea && !manualTaskTextarea.value) {
+            manualTaskTextarea.value = mainTaskTextarea.value;
+        }
+    }
+
+    if (openBtn) openBtn.addEventListener('click', openAddRace);
+    if (settingsOpenBtn) settingsOpenBtn.addEventListener('click', openAddRace);
+    if (closeBtn && addRaceModal) {
+        closeBtn.addEventListener('click', () => addRaceModal.classList.add('hidden'));
+    }
+    if (addRaceModal) {
+        addRaceModal.addEventListener('click', (e) => {
+            if (e.target === addRaceModal) addRaceModal.classList.add('hidden');
+        });
+    }
+
+    if (presetSrsBtn) {
+        presetSrsBtn.addEventListener('click', () => {
+            if (urlInput) urlInput.value = 'https://airtribune.com/srs-2026-6';
+            if (compInput) compInput.value = 'SRS Tapalpa 2026';
+        });
+    }
+
+    if (manualDrawBtn) {
+        manualDrawBtn.addEventListener('click', () => {
+            if (manualTaskTextarea && mainTaskTextarea) {
+                mainTaskTextarea.value = manualTaskTextarea.value;
+            }
+            drawTask();
+            if (addRaceModal) addRaceModal.classList.add('hidden');
+        });
+    }
+
+    if (importBtn) {
+        importBtn.addEventListener('click', async () => {
+            const url = urlInput ? urlInput.value.trim() : '';
+            const compName = compInput ? compInput.value.trim() : '';
+            const force = forceChk ? forceChk.checked : false;
+
+            if (!url) {
+                if (statusBox) {
+                    statusBox.style.display = 'block';
+                    statusBox.style.borderColor = 'var(--danger)';
+                    statusBox.textContent = 'Please enter an Airtribune competition or task URL.';
+                }
+                return;
+            }
+
+            importBtn.disabled = true;
+            const origText = importBtn.textContent;
+            importBtn.textContent = '⏳ Importing from Airtribune...';
+
+            if (statusBox) {
+                statusBox.style.display = 'block';
+                statusBox.style.borderColor = 'var(--accent)';
+                statusBox.innerHTML = 'Fetching waypoints, task definition, and extracting IGC tracklogs from Airtribune... (this may take 10–25 seconds)';
+            }
+
+            const payload = JSON.stringify({ url, compName, force });
+            const endpoints = ['/api/import-airtribune', 'http://localhost:8000/api/import-airtribune'];
+            let lastErr = null;
+            let data = null;
+
+            for (const ep of endpoints) {
+                try {
+                    const resp = await fetch(ep, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: payload
+                    });
+                    const contentType = resp.headers.get('content-type') || '';
+                    if (!contentType.includes('application/json')) {
+                        throw new Error('Local server API not active on this port');
+                    }
+                    const json = await resp.json();
+                    if (!resp.ok || !json.ok) {
+                        throw new Error(json.error || `HTTP ${resp.status}`);
+                    }
+                    data = json;
+                    break;
+                } catch (err) {
+                    lastErr = err;
+                }
+            }
+
+            importBtn.disabled = false;
+            importBtn.textContent = origText;
+
+            if (!data) {
+                if (statusBox) {
+                    statusBox.style.borderColor = 'var(--danger)';
+                    statusBox.innerHTML = `
+                        <div style="color: #fca5a5; font-weight: 600; margin-bottom: 4px;">Could not reach local importer: ${lastErr ? lastErr.message : 'Unknown error'}</div>
+                        <div style="color: var(--text-muted); font-size: 0.74rem;">
+                            Make sure the local server is running: <code>python3 server.py</code> (or run <code>python3 server.py --import "${url}"</code> in terminal), or use the Manual Upload section below.
+                        </div>
+                    `;
+                }
+                return;
+            }
+
+            const importedTasks = data.imported_tasks || [];
+            const newestTask = importedTasks[importedTasks.length - 1];
+            if (statusBox) {
+                statusBox.style.borderColor = '#22c55e';
+                const taskNames = importedTasks.map(t => `${t.name} (${(t.igc_files || []).length} tracks)`).join(', ');
+                statusBox.innerHTML = `<span style="color: #4ade80; font-weight: 600;">✓ Imported ${importedTasks.length} task(s):</span> ${taskNames}`;
+            }
+
+            // Refresh manifest dropdowns and automatically load the newly imported task
+            await setupPredefinedTasks(newestTask ? newestTask.id : null);
+        });
+    }
+}
+
 function handleWptUpload(e) {
     resetPredefinedTaskSelect();
     const file = e.target.files[0];
@@ -1124,13 +1301,18 @@ function drawTask() {
 
     // Pre-scan for a header row to build a column index map.
     // Expected header: "No \t Leg Dist. \t Id \t Radius \t Open \t Close \t Coordinates \t Altitude"
+    // or AirScore header: "Order \t Check \t Radius \t SS/ES \t Distance \t Name \t Description"
     let colMap = null; // null means legacy format
+    let isAirScoreFormat = false;
     for (let line of lines) {
         line = line.trim();
         if (!line) continue;
-        const headerParts = line.split(/\t+|\s{2,}/);
-        // Detect header by presence of both an "Id" and a "Radius" column
+        const headerParts = line.split(/\t+|\s{2,}/).map(s => s.trim()).filter(Boolean);
         const lc = headerParts.map(p => p.toLowerCase().replace(/[.\s]/g, ''));
+        if (lc.includes('order') && lc.includes('radius') && lc.includes('name')) {
+            isAirScoreFormat = true;
+            break;
+        }
         const idIdx     = lc.findIndex(p => p === 'id');
         const radiusIdx = lc.findIndex(p => p === 'radius');
         const distIdx   = lc.findIndex(p => p === 'legdist' || p === 'dist');
@@ -1145,7 +1327,7 @@ function drawTask() {
 
     for (let line of lines) {
         line = line.trim();
-        if (!line || line.startsWith('id') || line.startsWith('Radius') || line.toLowerCase().startsWith('name')) continue;
+        if (!line || line.startsWith('id') || line.startsWith('Radius') || line.toLowerCase().startsWith('name') || line.toLowerCase().startsWith('order')) continue;
         
         const startgateMatch = line.match(/^startgate\s*:\s*(\d{1,2}):(\d{2})(?::(\d{2}))?/i);
         if (startgateMatch) {
@@ -1167,97 +1349,138 @@ function drawTask() {
             continue;
         }
 
-        const parts = line.split(/\t+|\s{2,}/);
+        const parts = line.split(/\t+|\s{2,}/).map(s => s.trim()).filter(Boolean);
         if (parts.length < 2 && !line.match(/^(\S+)\s+(.+?)\s+([\d.]+)\s+([\d.]+)/)) continue;
 
         let id, type, radius = 0, dist = 0;
 
-        const spaceFormatMatch = line.match(/^(\S+)\s+(.+?)\s+([\d.]+)\s+([\d.]+)(?:\s+([-\d.]+,\s*[-\d.]+.*))?$/);
-        if (spaceFormatMatch && !line.toLowerCase().startsWith('name')) {
-            id = spaceFormatMatch[1].replace(/[^\w-]/g, '').trim();
-            const rawType = spaceFormatMatch[2].toLowerCase();
-            type = 'turnpoint';
-            if (rawType.includes('takeoff') || rawType.includes('launch')) type = 'launch';
-            else if (rawType.includes('sss') || rawType === 'ss') type = 'ss';
-            else if (rawType.includes('ess') || rawType === 'es') type = 'es';
-            else if (rawType.includes('goal')) type = 'goal';
-            
-            let rVal = parseFloat(spaceFormatMatch[3]);
-            radius = (rVal < 100) ? rVal * 1000 : rVal;
-            
-            let dVal = parseFloat(spaceFormatMatch[4]);
-            dist = (dVal < 500) ? dVal * 1000 : dVal;
-        } else if (colMap && colMap.idIdx !== -1 && parts.length > colMap.idIdx) {
-            // --- Tabular format: use header-derived column indices ---
-            // Skip the header row itself
-            const firstCell = parts[0].toLowerCase().replace(/[.\s]/g, '');
-            if (firstCell === 'no') continue;
+        // Check AirScore row format: e.g. "TO  0.0 km  D01  Gravedad Cero" or "1  Entry  26.000 km  SS  2.2 km  B41  Paso al Volcan"
+        const airScoreOrderMatch = line.match(/^(TO|TAKEOFF|LAUNCH|\d+|GOAL)\b/i);
+        if (isAirScoreFormat || (airScoreOrderMatch && /\b(Entry|Exit)\b/i.test(line))) {
+            if (!airScoreOrderMatch) continue;
+            const orderToken = airScoreOrderMatch[1].toUpperCase();
+            const unitMatches = [...line.matchAll(/(\d+(?:\.\d+)?)\s*(km|m)\b/gi)];
+            if (unitMatches.length === 0) continue;
 
-            // Row number cell may contain the type keyword, e.g. "2SS", "2 SS", "6ES", "6 ES"
-            const rowCell = (parts[colMap.noIdx] || parts[0]).toUpperCase();
-            id = parts[colMap.idIdx].replace(/[^\w-]/g, '').trim();
-            type = 'turnpoint';
-            if (rowCell.includes('SS')) type = 'ss';
-            else if (rowCell.includes('ES')) type = 'es';
-            else if (id.toUpperCase() === 'LAUNCH' || rowCell === '1' || rowCell.includes('TAKEOFF') || rowCell.includes('LAUNCH')) type = 'launch';
-            else if (rowCell.includes('GOAL')) type = 'goal';
-
-            // Radius column: strip non-numeric, convert km→m
-            if (colMap.radiusIdx !== -1 && parts.length > colMap.radiusIdx) {
-                let rawRadius = parts[colMap.radiusIdx];
-                // If the radius cell contains a type keyword, columns are shifted
-                if (['launch', 'ss', 'es', 'goal'].includes(rawRadius.toLowerCase().trim())) {
-                    type = rawRadius.toLowerCase().trim();
-                    rawRadius = parts[colMap.radiusIdx + 1] || rawRadius;
-                }
-                const rVal = parseFloat(rawRadius.replace(/[^\d.]/g, ''));
-                if (!isNaN(rVal)) {
-                    radius = /km/i.test(rawRadius) ? rVal * 1000 : rVal;
+            if (unitMatches.length >= 2) {
+                const rVal = parseFloat(unitMatches[0][1]);
+                radius = unitMatches[0][2].toLowerCase() === 'km' ? rVal * 1000 : rVal;
+                const dVal = parseFloat(unitMatches[1][1]);
+                dist = unitMatches[1][2].toLowerCase() === 'km' ? dVal * 1000 : dVal;
+            } else {
+                const val = parseFloat(unitMatches[0][1]);
+                const valMeters = unitMatches[0][2].toLowerCase() === 'km' ? val * 1000 : val;
+                if (orderToken === 'TO' || orderToken === 'TAKEOFF' || orderToken === 'LAUNCH') {
+                    radius = 400;
+                    dist = valMeters;
                 } else {
-                    // Fallback to regex
-                    const matches = [...line.matchAll(/(\d+(?:\.\d+)?)\s*(m|km)/gi)];
-                    if (matches.length >= 1) {
-                        const rVal2 = parseFloat(matches[0][1]);
-                        radius = matches[0][2].toLowerCase() === 'km' ? rVal2 * 1000 : rVal2;
-                    }
+                    radius = valMeters;
                 }
             }
 
-            // Leg distance column
-            if (colMap.distIdx !== -1 && parts.length > colMap.distIdx) {
-                let rawDist = parts[colMap.distIdx];
-                // If radius cell contained a type keyword, the distance cell is also shifted
-                if (parts[colMap.radiusIdx] && ['launch', 'ss', 'es', 'goal'].includes(parts[colMap.radiusIdx].toLowerCase().trim())) {
-                    rawDist = parts[colMap.distIdx + 1] || rawDist;
-                }
-                const dVal = parseFloat(rawDist.replace(/[^\d.]/g, ''));
-                if (!isNaN(dVal)) {
-                    dist = /km/i.test(rawDist) ? dVal * 1000 : dVal;
-                } else {
-                    // Fallback to regex
-                    const matches = [...line.matchAll(/(\d+(?:\.\d+)?)\s*(m|km)/gi)];
-                    if (matches.length >= 2) {
-                        const dVal2 = parseFloat(matches[1][1]);
-                        dist = matches[1][2].toLowerCase() === 'km' ? dVal2 * 1000 : dVal2;
-                    }
-                }
+            const lastUnitMatch = unitMatches[unitMatches.length - 1];
+            const afterDist = line.substring(lastUnitMatch.index + lastUnitMatch[0].length).trim();
+            const afterTokens = afterDist.split(/\s+/);
+            id = (afterTokens[0] || '').replace(/[^\w-]/g, '').trim();
+
+            type = 'turnpoint';
+            if (orderToken === 'TO' || orderToken === 'TAKEOFF' || orderToken === 'LAUNCH') {
+                type = 'launch';
+            } else if (/\b(SS|SSS)\b/i.test(line)) {
+                type = 'ss';
+            } else if (/\b(ES|ESS)\b/i.test(line)) {
+                type = 'es';
+            } else if (orderToken === 'GOAL') {
+                type = 'goal';
             }
         } else {
-            // --- Legacy format: ID is parts[0], optional type keyword is parts[1] ---
-            id = parts[0].trim();
-            type = 'turnpoint';
-            const p1 = parts[1].toLowerCase().trim();
-            if (['launch', 'ss', 'es', 'goal'].includes(p1)) type = p1;
+            const spaceFormatMatch = line.match(/^(\S+)\s+(.+?)\s+([\d.]+)\s+([\d.]+)(?:\s+([-\d.]+,\s*[-\d.]+.*))?$/);
+            if (spaceFormatMatch && !line.toLowerCase().startsWith('name')) {
+                id = spaceFormatMatch[1].replace(/[^\w-]/g, '').trim();
+                const rawType = spaceFormatMatch[2].toLowerCase();
+                type = 'turnpoint';
+                if (rawType.includes('takeoff') || rawType.includes('launch')) type = 'launch';
+                else if (rawType.includes('sss') || rawType === 'ss') type = 'ss';
+                else if (rawType.includes('ess') || rawType === 'es') type = 'es';
+                else if (rawType.includes('goal')) type = 'goal';
+                
+                let rVal = parseFloat(spaceFormatMatch[3]);
+                radius = (rVal < 100) ? rVal * 1000 : rVal;
+                
+                let dVal = parseFloat(spaceFormatMatch[4]);
+                dist = (dVal < 500) ? dVal * 1000 : dVal;
+            } else if (colMap && colMap.idIdx !== -1 && parts.length > colMap.idIdx) {
+                // --- Tabular format: use header-derived column indices ---
+                // Skip the header row itself
+                const firstCell = parts[0].toLowerCase().replace(/[.\s]/g, '');
+                if (firstCell === 'no') continue;
 
-            // Extract radius and distance via regex (legacy order: radius first, dist second)
-            const matches = [...line.matchAll(/(\d+(?:\.\d+)?)\s*(m|km)/gi)];
-            if (matches.length >= 1) {
-                const rVal = parseFloat(matches[0][1]);
-                radius = matches[0][2].toLowerCase() === 'km' ? rVal * 1000 : rVal;
-            }
-            if (matches.length >= 2) {
-                const dVal = parseFloat(matches[1][1]);
-                dist = matches[1][2].toLowerCase() === 'km' ? dVal * 1000 : dVal;
+                // Row number cell may contain the type keyword, e.g. "2SS", "2 SS", "6ES", "6 ES"
+                const rowCell = (parts[colMap.noIdx] || parts[0]).toUpperCase();
+                id = parts[colMap.idIdx].replace(/[^\w-]/g, '').trim();
+                type = 'turnpoint';
+                if (rowCell.includes('SS')) type = 'ss';
+                else if (rowCell.includes('ES')) type = 'es';
+                else if (id.toUpperCase() === 'LAUNCH' || rowCell === '1' || rowCell.includes('TAKEOFF') || rowCell.includes('LAUNCH')) type = 'launch';
+                else if (rowCell.includes('GOAL')) type = 'goal';
+
+                // Radius column: strip non-numeric, convert km→m
+                if (colMap.radiusIdx !== -1 && parts.length > colMap.radiusIdx) {
+                    let rawRadius = parts[colMap.radiusIdx];
+                    // If the radius cell contains a type keyword, columns are shifted
+                    if (['launch', 'ss', 'es', 'goal'].includes(rawRadius.toLowerCase().trim())) {
+                        type = rawRadius.toLowerCase().trim();
+                        rawRadius = parts[colMap.radiusIdx + 1] || rawRadius;
+                    }
+                    const rVal = parseFloat(rawRadius.replace(/[^\d.]/g, ''));
+                    if (!isNaN(rVal)) {
+                        radius = /km/i.test(rawRadius) ? rVal * 1000 : rVal;
+                    } else {
+                        // Fallback to regex
+                        const matches = [...line.matchAll(/(\d+(?:\.\d+)?)\s*(m|km)/gi)];
+                        if (matches.length >= 1) {
+                            const rVal2 = parseFloat(matches[0][1]);
+                            radius = matches[0][2].toLowerCase() === 'km' ? rVal2 * 1000 : rVal2;
+                        }
+                    }
+                }
+
+                // Leg distance column
+                if (colMap.distIdx !== -1 && parts.length > colMap.distIdx) {
+                    let rawDist = parts[colMap.distIdx];
+                    // If radius cell contained a type keyword, the distance cell is also shifted
+                    if (parts[colMap.radiusIdx] && ['launch', 'ss', 'es', 'goal'].includes(parts[colMap.radiusIdx].toLowerCase().trim())) {
+                        rawDist = parts[colMap.distIdx + 1] || rawDist;
+                    }
+                    const dVal = parseFloat(rawDist.replace(/[^\d.]/g, ''));
+                    if (!isNaN(dVal)) {
+                        dist = /km/i.test(rawDist) ? dVal * 1000 : dVal;
+                    } else {
+                        // Fallback to regex
+                        const matches = [...line.matchAll(/(\d+(?:\.\d+)?)\s*(m|km)/gi)];
+                        if (matches.length >= 2) {
+                            const dVal2 = parseFloat(matches[1][1]);
+                            dist = matches[1][2].toLowerCase() === 'km' ? dVal2 * 1000 : dVal2;
+                        }
+                    }
+                }
+            } else {
+                // --- Legacy format: ID is parts[0], optional type keyword is parts[1] ---
+                id = parts[0].trim();
+                type = 'turnpoint';
+                const p1 = parts[1].toLowerCase().trim();
+                if (['launch', 'ss', 'es', 'goal'].includes(p1)) type = p1;
+
+                // Extract radius and distance via regex (legacy order: radius first, dist second)
+                const matches = [...line.matchAll(/(\d+(?:\.\d+)?)\s*(m|km)/gi)];
+                if (matches.length >= 1) {
+                    const rVal = parseFloat(matches[0][1]);
+                    radius = matches[0][2].toLowerCase() === 'km' ? rVal * 1000 : rVal;
+                }
+                if (matches.length >= 2) {
+                    const dVal = parseFloat(matches[1][1]);
+                    dist = matches[1][2].toLowerCase() === 'km' ? dVal * 1000 : dVal;
+                }
             }
         }
 
@@ -1801,14 +2024,78 @@ async function fetchTrackTerrainProfileDirect(track) {
     }
 }
 
+async function extractTextFilesFromZip(arrayBuffer) {
+    const view = new DataView(arrayBuffer);
+    const bytes = new Uint8Array(arrayBuffer);
+    const decoder = new TextDecoder('utf-8');
+    const results = [];
+
+    // Locate End of Central Directory (EOCD) signature 0x06054b50
+    let eocdOffset = -1;
+    for (let i = bytes.length - 22; i >= Math.max(0, bytes.length - 65557); i--) {
+        if (view.getUint32(i, true) === 0x06054b50) {
+            eocdOffset = i;
+            break;
+        }
+    }
+    if (eocdOffset === -1) {
+        throw new Error('Invalid ZIP archive');
+    }
+
+    const totalEntries = view.getUint16(eocdOffset + 10, true);
+    let cdOffset = view.getUint32(eocdOffset + 16, true);
+
+    for (let i = 0; i < totalEntries; i++) {
+        if (view.getUint32(cdOffset, true) !== 0x02014b50) break;
+        const compressionMethod = view.getUint16(cdOffset + 10, true);
+        const compressedSize = view.getUint32(cdOffset + 20, true);
+        const fileNameLen = view.getUint16(cdOffset + 28, true);
+        const extraLen = view.getUint16(cdOffset + 30, true);
+        const commentLen = view.getUint16(cdOffset + 32, true);
+        const localHeaderOffset = view.getUint32(cdOffset + 42, true);
+
+        const rawName = decoder.decode(bytes.subarray(cdOffset + 46, cdOffset + 46 + fileNameLen));
+        cdOffset += 46 + fileNameLen + extraLen + commentLen;
+
+        if (rawName.endsWith('/') || rawName.startsWith('__MACOSX')) continue;
+        const baseName = rawName.substring(rawName.lastIndexOf('/') + 1);
+        if (!/\.(igc|gpx|kml)$/i.test(baseName)) continue;
+
+        if (view.getUint32(localHeaderOffset, true) !== 0x04034b50) continue;
+        const localNameLen = view.getUint16(localHeaderOffset + 26, true);
+        const localExtraLen = view.getUint16(localHeaderOffset + 28, true);
+        const dataStart = localHeaderOffset + 30 + localNameLen + localExtraLen;
+        const compressedSlice = bytes.subarray(dataStart, dataStart + compressedSize);
+
+        let textContent = '';
+        if (compressionMethod === 0) {
+            textContent = decoder.decode(compressedSlice);
+        } else if (compressionMethod === 8 && typeof DecompressionStream !== 'undefined') {
+            const ds = new DecompressionStream('deflate-raw');
+            const writer = ds.writable.getWriter();
+            writer.write(compressedSlice);
+            writer.close();
+            const decompressedBuf = await new Response(ds.readable).arrayBuffer();
+            textContent = decoder.decode(new Uint8Array(decompressedBuf));
+        } else {
+            continue;
+        }
+
+        results.push({ name: baseName, content: textContent });
+    }
+    return results;
+}
+
 async function handleFileUpload(e) {
     resetPredefinedTaskSelect();
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
-    // Close settings modal immediately so progress bar is visible floating on the page
+    // Close modals immediately so progress bar is visible floating on the page
     const modal = document.getElementById('settings-modal');
     if (modal) modal.classList.add('hidden');
+    const addRaceModal = document.getElementById('add-race-modal');
+    if (addRaceModal) addRaceModal.classList.add('hidden');
 
     const loader = document.getElementById('track-loader');
     const fill = document.getElementById('loader-bar-fill');
@@ -1816,34 +2103,62 @@ async function handleFileUpload(e) {
 
     if (loader) {
         loader.classList.remove('hidden');
-        if (text) text.textContent = `Preparing to load ${files.length} files...`;
+        if (text) text.textContent = `Preparing to load ${files.length} file(s)...`;
         if (fill) fill.style.width = '0%';
     }
 
     // Yield thread to let modal close and loader render
     await new Promise(resolve => setTimeout(resolve, 100));
 
-    let successfulCount = 0;
-
+    // Expand any .zip archives into virtual { name, content } items
+    const trackEntries = [];
     for (let i = 0; i < files.length; i++) {
         const file = files[i];
-        const name = file.name;
+        if (file.name.toLowerCase().endsWith('.zip')) {
+            if (text) text.textContent = `Extracting ${file.name}...`;
+            await new Promise(resolve => setTimeout(resolve, 20));
+            try {
+                const buf = await file.arrayBuffer();
+                const extracted = await extractTextFilesFromZip(buf);
+                trackEntries.push(...extracted);
+            } catch (zipErr) {
+                console.error(`Error extracting zip ${file.name}:`, zipErr);
+            }
+        } else {
+            try {
+                const content = await file.text();
+                trackEntries.push({ name: file.name, content });
+            } catch (readErr) {
+                console.error(`Error reading file ${file.name}:`, readErr);
+            }
+        }
+    }
+
+    let successfulCount = 0;
+
+    for (let i = 0; i < trackEntries.length; i++) {
+        let name = trackEntries[i].name;
+        const content = trackEntries[i].content;
+
+        // If filename is purely numeric (like Airtribune's 0001.igc), extract pilot name from IGC header
+        const stem = name.replace(/\.(igc|gpx|kml)$/i, '');
+        if (!/[a-zA-Z]/.test(stem) && name.toLowerCase().endsWith('.igc')) {
+            const hdrPilot = extractIGCPilotName(content);
+            if (hdrPilot) {
+                name = `${hdrPilot}_${stem}.igc`;
+            }
+        }
+
         const cleanName = formatPilotName(name);
 
-        if (text) text.textContent = `Reading ${cleanName}... (${i + 1}/${files.length})`;
-        if (fill) fill.style.width = `${(i / files.length) * 100}%`;
+        if (text) text.textContent = `Reading ${cleanName}... (${i + 1}/${trackEntries.length})`;
+        if (fill) fill.style.width = `${(i / trackEntries.length) * 100}%`;
 
-        // Yield thread to let UI update
-        await new Promise(resolve => setTimeout(resolve, 20));
+        if (i % 5 === 0) {
+            await new Promise(resolve => setTimeout(resolve, 10));
+        }
 
         try {
-            const content = await new Promise((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onload = (event) => resolve(event.target.result);
-                reader.onerror = (err) => reject(err);
-                reader.readAsText(file);
-            });
-
             let rawPoints = [];
             if (name.toLowerCase().endsWith('.igc')) {
                 rawPoints = parseIGC(content);
@@ -1874,6 +2189,85 @@ async function handleFileUpload(e) {
 
     // Reset file input
     e.target.value = '';
+}
+
+let currentHoveredTrack = null;
+
+function setHoveredPilot(track, source = 'map') {
+    if (currentHoveredTrack === track) return;
+    
+    // 1. Un-highlight previously hovered pilot
+    if (currentHoveredTrack) {
+        const prev = currentHoveredTrack;
+        if (prev.marker) {
+            prev.marker.setZIndexOffset(0);
+            const el = prev.marker.getElement();
+            if (el) el.classList.remove('pilot-marker-hovered');
+            if (prev.marker.closeTooltip) {
+                prev.marker.closeTooltip();
+            }
+        }
+        if (prev.polyline) {
+            prev.polyline.setStyle({
+                weight: 1.5,
+                opacity: 0.6
+            });
+        }
+        const prevRow = document.getElementById(`row-${prev.id}`);
+        if (prevRow) prevRow.classList.remove('pilot-row-hovered');
+    }
+
+    currentHoveredTrack = track;
+
+    // 2. Apply highlight to newly hovered pilot
+    if (track) {
+        // A. Highlight on map
+        if (track.marker) {
+            track.marker.setZIndexOffset(10000);
+            const el = track.marker.getElement();
+            if (el) el.classList.add('pilot-marker-hovered');
+            if (track.marker.openTooltip) {
+                track.marker.openTooltip();
+            }
+            if (track.marker.bringToFront) {
+                track.marker.bringToFront();
+            }
+        }
+        if (track.polyline) {
+            track.polyline.setStyle({
+                weight: 4,
+                opacity: 1.0
+            });
+            if (track.polyline.bringToFront) {
+                track.polyline.bringToFront();
+            }
+        }
+
+        // B. Highlight in pilot list table
+        const row = document.getElementById(`row-${track.id}`);
+        if (row) {
+            row.classList.add('pilot-row-hovered');
+            if (source !== 'table') {
+                row.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
+        }
+
+        // C. Highlight on side view
+        if (source !== 'sideview' && sideView) {
+            sideView.hoveredPilot = track;
+            if (sideView.lastState) {
+                sideView.requestRender(sideView.lastState);
+            }
+        }
+    } else {
+        // Clear side view hover
+        if (source !== 'sideview' && sideView && sideView.hoveredPilot) {
+            sideView.hoveredPilot = null;
+            if (sideView.lastState) {
+                sideView.requestRender(sideView.lastState);
+            }
+        }
+    }
 }
 
 function addTrackToState(rawName, points, terrainProfile = null) {
@@ -1920,7 +2314,7 @@ function addTrackToState(rawName, points, terrainProfile = null) {
 
     // Dynamic Pilot Marker (Paraglider Wing shape - Symmetrical Top-Down View)
     const iconHtml = `
-        <div class="pilot-marker-icon" title="${fullName}">
+        <div class="pilot-marker-icon">
             <div class="pilot-marker-dot" style="transform: rotate(${initialHeading}deg); width: ${targetSize}px; height: ${targetSize}px; top: -${topOffset}px; left: -${leftOffset}px; transform-origin: 50% 50%;">
                 <svg width="${targetSize}" height="${targetSize}" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <!-- Pod Harness (Pilot) - sticking out front and back, nose at 16.5, tail at 33, CG at 24 -->
@@ -1949,7 +2343,15 @@ function addTrackToState(rawName, points, terrainProfile = null) {
         iconAnchor: [0, 0]
     });
     
-    const marker = L.marker([points[0].lat, points[0].lng], { icon, title: fullName }).addTo(layerGroup);
+    const marker = L.marker([points[0].lat, points[0].lng], { icon }).addTo(layerGroup);
+
+    // Instant tooltip showing full name above pilot marker
+    marker.bindTooltip(fullName, {
+        direction: 'top',
+        offset: [0, -topOffset - 4],
+        className: 'pilot-name-tooltip',
+        opacity: 0.95
+    });
 
     const trackObj = {
         id,
@@ -1967,6 +2369,35 @@ function addTrackToState(rawName, points, terrainProfile = null) {
         lastHeading: initialHeading
     };
 
+    // Fast hover event listeners for top view marker and track polyline
+    marker.on('mouseover', () => {
+        setHoveredPilot(trackObj, 'map');
+    });
+    marker.on('mouseout', () => {
+        setHoveredPilot(null, 'map');
+    });
+    marker.on('click', () => {
+        const row = document.getElementById(`row-${trackObj.id}`);
+        if (row) {
+            row.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            row.click();
+        }
+    });
+
+    polyline.on('mouseover', () => {
+        setHoveredPilot(trackObj, 'map');
+    });
+    polyline.on('mouseout', () => {
+        setHoveredPilot(null, 'map');
+    });
+    polyline.on('click', () => {
+        const row = document.getElementById(`row-${trackObj.id}`);
+        if (row) {
+            row.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            row.click();
+        }
+    });
+
     state.tracks.push(trackObj);
 
     // Update global min/max time
@@ -1975,6 +2406,7 @@ function addTrackToState(rawName, points, terrainProfile = null) {
     if (tMin < state.minTime) state.minTime = tMin;
     if (tMax > state.maxTime) state.maxTime = tMax;
 }
+
 
 function updateMarkerSizes() {
     if (!state.map || state.tracks.length === 0) return;
@@ -2017,8 +2449,12 @@ function updateMarkerSizes() {
                 label.style.top = `${labelTop}px`;
             }
         }
+        if (track.marker && track.marker.getTooltip()) {
+            track.marker.getTooltip().options.offset = [0, -topOffset - 4];
+        }
     });
 }
+
 
 function clearTracks() {
     if (state.isPlaying) {
@@ -2255,6 +2691,15 @@ function updatePilotListUI() {
             detailsRow.style.display = isOpen ? 'none' : 'table-row';
             row.classList.toggle('expanded', !isOpen);
         });
+
+        // Hover row to cross-highlight on map and side view
+        row.addEventListener('mouseenter', () => {
+            setHoveredPilot(track, 'table');
+        });
+        row.addEventListener('mouseleave', () => {
+            setHoveredPilot(null, 'table');
+        });
+
 
         const chk = row.querySelector('.chk-track');
         if (chk) {

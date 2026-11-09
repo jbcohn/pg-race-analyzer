@@ -21,12 +21,24 @@ export class SideView {
         
         this.hoveredPilot = null;
         this.pilotCoords = [];
+        this.onPilotHover = null;
+        this._rafPending = false;
+        this._cachedBounds = null;
         
         this.setupEventListeners();
         this.resize();
         window.addEventListener('resize', () => {
             this.hasAutoFit = false;
             this.resize();
+        });
+    }
+
+    requestRender(state) {
+        if (this._rafPending) return;
+        this._rafPending = true;
+        requestAnimationFrame(() => {
+            this._rafPending = false;
+            this.render(state);
         });
     }
 
@@ -99,22 +111,46 @@ export class SideView {
             const mouseY = e.clientY - rect.top;
             
             let foundHover = null;
-            let minDist = 15; // Proximity threshold in pixels
             
-            for (const pc of this.pilotCoords) {
-                const dx = mouseX - pc.x;
-                const dy = mouseY - pc.y;
-                const dist = Math.sqrt(dx*dx + dy*dy);
-                if (dist < minDist) {
-                    minDist = dist;
-                    foundHover = pc.track;
+            // Priority 1: Direct hit on initials label box (with 4px padding for responsive targeting)
+            // Iterate in reverse so topmost rendered label takes precedence
+            const pad = 4;
+            for (let i = this.pilotCoords.length - 1; i >= 0; i--) {
+                const pc = this.pilotCoords[i];
+                if (pc.labelBox) {
+                    const lb = pc.labelBox;
+                    if (mouseX >= lb.x - pad && mouseX <= lb.x + lb.w + pad &&
+                        mouseY >= lb.y - pad && mouseY <= lb.y + lb.h + pad) {
+                        foundHover = pc.track;
+                        break;
+                    }
+                }
+            }
+
+            // Priority 2: Proximity to pilot dot (18px radius)
+            if (!foundHover) {
+                let minDist = 18;
+                for (let i = this.pilotCoords.length - 1; i >= 0; i--) {
+                    const pc = this.pilotCoords[i];
+                    const dx = mouseX - pc.x;
+                    const dy = mouseY - pc.y;
+                    const dist = Math.sqrt(dx*dx + dy*dy);
+                    if (dist < minDist) {
+                        minDist = dist;
+                        foundHover = pc.track;
+                    }
                 }
             }
             
             if (foundHover !== this.hoveredPilot) {
                 this.hoveredPilot = foundHover;
                 this.canvas.style.cursor = foundHover ? 'pointer' : '';
-                if (this.lastState) this.render(this.lastState);
+                if (this.onPilotHover) {
+                    this.onPilotHover(foundHover);
+                }
+                if (this.lastState) {
+                    this.requestRender(this.lastState);
+                }
             }
         });
 
@@ -122,9 +158,15 @@ export class SideView {
             if (this.hoveredPilot) {
                 this.hoveredPilot = null;
                 this.canvas.style.cursor = '';
-                if (this.lastState) this.render(this.lastState);
+                if (this.onPilotHover) {
+                    this.onPilotHover(null);
+                }
+                if (this.lastState) {
+                    this.requestRender(this.lastState);
+                }
             }
         });
+
 
         this.canvas.addEventListener('wheel', (e) => {
             e.preventDefault();
@@ -198,68 +240,72 @@ export class SideView {
         const totalTaskDist = optTask ? optTask.totalDist : calculateRemainingLegs(state.task, 0, endGoalIdx);
         const goalTP = state.task[endGoalIdx];
         const goalRadiusKm = (goalTP.radius || 0) / 1000;
-        let maxScaleDist = totalTaskDist + goalRadiusKm;
-
-        // If no pilot got close to goal, zoom the X-axis to the max distance actually flown
-        // so the side view doesn't show a mostly empty task on difficult/unfinished days.
-        {
+        const terrainProfile = state.terrainProfile || null;
+        // Cache bounds if tracks and task have not changed to eliminate 500,000-point loops on every hover
+        const tracksKey = `${state.tracks.length}_${state.tracks.filter(t => t.visible !== false).length}_${state.activeTaskName || ''}_${terrainProfile ? terrainProfile.length : 0}`;
+        if (!this._cachedBounds || this._cachedBounds.key !== tracksKey) {
             let maxDistFlown = 0;
             let anyGoalCrossed = false;
             state.tracks.forEach(track => {
                 if (track.visible === false || !track.tactics || !track.tactics.grToGoalSeries) return;
                 const series = track.tactics.grToGoalSeries;
-                for (const s of series) {
+                for (let i = 0; i < series.length; i++) {
+                    const s = series[i];
                     const df = s.distFlown !== undefined ? s.distFlown : Math.max(0, totalTaskDist - s.distToGoal);
                     if (df > maxDistFlown) maxDistFlown = df;
                     if (df >= totalTaskDist) anyGoalCrossed = true;
                 }
             });
-            // Only shrink the scale if no pilot crossed goal and the max flown is
-            // less than 75% of the task distance (clearly a short day).
+            let calculatedMaxScale = totalTaskDist + goalRadiusKm;
             if (!anyGoalCrossed && maxDistFlown > 0 && maxDistFlown < totalTaskDist * 0.75) {
-                maxScaleDist = Math.min(maxScaleDist, maxDistFlown * 1.10 + goalRadiusKm);
+                calculatedMaxScale = Math.min(calculatedMaxScale, maxDistFlown * 1.10 + goalRadiusKm);
             }
+
+            let minAlt = Infinity;
+            let maxAlt = -Infinity;
+            if (terrainProfile && terrainProfile.length > 0) {
+                for (let i = 0; i < terrainProfile.length; i++) {
+                    const alt = terrainProfile[i].elevFt;
+                    if (alt < minAlt) minAlt = alt;
+                    if (alt > maxAlt) maxAlt = alt;
+                }
+            } else {
+                for (let i = 0; i <= endGoalIdx; i++) {
+                    const elevFt = (state.task[i].elev || 0) * 3.28084;
+                    if (elevFt < minAlt) minAlt = elevFt;
+                    if (elevFt > maxAlt) maxAlt = elevFt;
+                }
+            }
+            state.tracks.forEach(track => {
+                if (track.visible === false || !track.points) return;
+                for (let i = 0; i < track.points.length; i++) {
+                    const altFt = track.points[i].alt * 3.28084;
+                    if (altFt < minAlt) minAlt = altFt;
+                    if (altFt > maxAlt) maxAlt = altFt;
+                }
+            });
+            if (minAlt === Infinity) minAlt = 0;
+            if (maxAlt === -Infinity) maxAlt = 2000;
+            maxAlt += 500;
+            if (maxAlt - minAlt < 1000) maxAlt = minAlt + 1000;
+
+            this._cachedBounds = {
+                key: tracksKey,
+                maxScaleDist: calculatedMaxScale,
+                minAltFt: minAlt,
+                maxAltFt: maxAlt
+            };
         }
 
-        // Compute altitude bounds from terrain profile (or task elevations) AND pilot tracks
-        let minAltFt = Infinity;
-        let maxAltFt = -Infinity;
-
-        // Use terrain profile if available, otherwise task turnpoint elevations
-        const terrainProfile = state.terrainProfile || null;
-        if (terrainProfile && terrainProfile.length > 0) {
-            for (const pt of terrainProfile) {
-                if (pt.elevFt < minAltFt) minAltFt = pt.elevFt;
-                if (pt.elevFt > maxAltFt) maxAltFt = pt.elevFt;
-            }
-        } else {
-            for (let i = 0; i <= endGoalIdx; i++) {
-                const elevFt = (state.task[i].elev || 0) * 3.28084;
-                if (elevFt < minAltFt) minAltFt = elevFt;
-                if (elevFt > maxAltFt) maxAltFt = elevFt;
-            }
-        }
-
-        // Include pilot altitude range using the full track to ensure vertical scale stability
-        state.tracks.forEach(track => {
-            if (track.visible === false || !track.points) return;
-            for (let i = 0; i < track.points.length; i++) {
-                const altFt = track.points[i].alt * 3.28084;
-                if (altFt < minAltFt) minAltFt = altFt;
-                if (altFt > maxAltFt) maxAltFt = altFt;
-            }
-        });
-
-        if (minAltFt === Infinity) minAltFt = 0;
-        if (maxAltFt === -Infinity) maxAltFt = 2000;
-        // Set ceiling to 500' above max altitude
-        maxAltFt += 500;
-        if (maxAltFt - minAltFt < 1000) maxAltFt = minAltFt + 1000;
+        const maxScaleDist = this._cachedBounds.maxScaleDist;
+        const minAltFt = this._cachedBounds.minAltFt;
+        const maxAltFt = this._cachedBounds.maxAltFt;
 
         // Auto-fit viewport on first render or after resize
         if (!this.hasAutoFit) {
             this.autoFitToData(maxScaleDist, minAltFt, maxAltFt);
         }
+
 
         const mapX = (km) => this.viewport.offsetX + (km * this.viewport.scaleX);
         const mapY = (ft) => this.viewport.offsetY - (ft * this.viewport.scaleY);
@@ -611,29 +657,38 @@ export class SideView {
             
             // Pilot dot
             if (lastX !== null && lastY !== null) {
-                // Populate coordinate list for hover detection
-                this.pilotCoords.push({ x: lastX, y: lastY, track });
+                const isHovered = this.hoveredPilot && this.hoveredPilot.id === track.id;
+
+                if (isHovered) {
+                    // Glowing outer aura around hovered pilot dot
+                    ctx.save();
+                    ctx.fillStyle = 'rgba(56, 189, 248, 0.4)';
+                    ctx.beginPath();
+                    ctx.arc(lastX, lastY, 11, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.restore();
+                }
 
                 ctx.fillStyle = resolvedColor;
                 ctx.beginPath();
-                ctx.arc(lastX, lastY, 5, 0, Math.PI * 2);
+                ctx.arc(lastX, lastY, isHovered ? 6.5 : 5, 0, Math.PI * 2);
                 ctx.fill();
-                ctx.strokeStyle = '#ffffff';
-                ctx.lineWidth = 1.5;
+                ctx.strokeStyle = isHovered ? '#38bdf8' : '#ffffff';
+                ctx.lineWidth = isHovered ? 2 : 1.5;
                 ctx.stroke();
                 
                 // Draw pilot name label
                 ctx.save();
-                ctx.font = 'bold 9px Inter, Arial, sans-serif';
-                ctx.fillStyle = resolvedColor;
+                ctx.font = isHovered ? 'bold 10px Inter, Arial, sans-serif' : 'bold 9px Inter, Arial, sans-serif';
+                ctx.fillStyle = isHovered ? '#38bdf8' : resolvedColor;
                 ctx.textAlign = 'left';
                 ctx.textBaseline = 'middle';
                 
                 const labelText = track.initials || track.name;
                 const textWidth = ctx.measureText(labelText).width;
-                const boxW = textWidth + 6;
-                const boxH = 12;
-                let labelX = lastX + 8;
+                const boxW = textWidth + (isHovered ? 8 : 6);
+                const boxH = isHovered ? 14 : 12;
+                let labelX = lastX + (isHovered ? 9 : 8);
                 let labelY = lastY;
 
                 // Adjust label position if overlapping previously rendered labels
@@ -642,7 +697,7 @@ export class SideView {
                 let yOffset = 0;
                 while (collision && attempts < 6) {
                     collision = false;
-                    const curBox = { x: labelX, y: labelY + yOffset - 6, w: boxW, h: boxH };
+                    const curBox = { x: labelX, y: labelY + yOffset - boxH / 2, w: boxW, h: boxH };
                     for (const prev of renderedLabels) {
                         if (curBox.x < prev.x + prev.w &&
                             curBox.x + curBox.w > prev.x &&
@@ -654,20 +709,29 @@ export class SideView {
                     }
                     if (collision) {
                         attempts++;
-                        yOffset = (attempts % 2 === 1) ? -(Math.ceil(attempts / 2) * 13) : (Math.ceil(attempts / 2) * 13);
+                        yOffset = (attempts % 2 === 1) ? -(Math.ceil(attempts / 2) * (boxH + 1)) : (Math.ceil(attempts / 2) * (boxH + 1));
                     }
                 }
 
                 labelY += yOffset;
-                renderedLabels.push({ x: labelX, y: labelY - 6, w: boxW, h: boxH });
+                const labelBox = { x: labelX, y: labelY - boxH / 2, w: boxW, h: boxH };
+                renderedLabels.push(labelBox);
                 
                 // Draw background box for readability
-                ctx.fillStyle = 'rgba(15, 23, 42, 0.75)'; // dark background matching var(--bg-main)
-                ctx.fillRect(labelX, labelY - 6, boxW, boxH);
+                ctx.fillStyle = isHovered ? 'rgba(15, 23, 42, 0.95)' : 'rgba(15, 23, 42, 0.75)';
+                ctx.fillRect(labelBox.x, labelBox.y, labelBox.w, labelBox.h);
+                if (isHovered) {
+                    ctx.strokeStyle = '#38bdf8';
+                    ctx.lineWidth = 1.2;
+                    ctx.strokeRect(labelBox.x, labelBox.y, labelBox.w, labelBox.h);
+                }
                 
-                ctx.fillStyle = resolvedColor;
-                ctx.fillText(labelText, labelX + 3, labelY);
+                ctx.fillStyle = isHovered ? '#ffffff' : resolvedColor;
+                ctx.fillText(labelText, labelX + (isHovered ? 4 : 3), labelY);
                 ctx.restore();
+
+                // Store both center dot and initials label box for fast, accurate hover detection
+                this.pilotCoords.push({ x: lastX, y: lastY, labelBox, track });
             }
         });
 
@@ -704,14 +768,14 @@ export class SideView {
         if (this.hoveredPilot) {
             const pc = this.pilotCoords.find(c => c.track.id === this.hoveredPilot.id);
             if (pc) {
-                this.drawHoverTooltip(ctx, pc.x, pc.y, this.hoveredPilot.fullName || this.hoveredPilot.name);
+                this.drawHoverTooltip(ctx, pc.x, pc.y, this.hoveredPilot.fullName || this.hoveredPilot.name, pc.labelBox);
             }
         }
     }
 
-    drawHoverTooltip(ctx, x, y, text) {
+    drawHoverTooltip(ctx, x, y, text, labelBox = null) {
         ctx.save();
-        ctx.font = '500 11px Inter, Arial, sans-serif';
+        ctx.font = '600 11px Inter, Arial, sans-serif';
         
         const textWidth = ctx.measureText(text).width;
         const paddingH = 8;
@@ -719,19 +783,26 @@ export class SideView {
         const tooltipW = textWidth + paddingH * 2;
         const tooltipH = 16 + paddingV * 2; // ~26px height
         
-        // Target coordinates: centered above (x, y)
-        let tx = x - tooltipW / 2;
-        let ty = y - tooltipH - 8;
+        // Target coordinates: centered above label box if present, otherwise above dot
+        const targetCenterX = labelBox ? (labelBox.x + labelBox.w / 2) : x;
+        const targetTopY = labelBox ? Math.min(y - 8, labelBox.y) : (y - 8);
+        
+        let tx = targetCenterX - tooltipW / 2;
+        let ty = targetTopY - tooltipH - 6;
         
         // Clamp to canvas borders
         if (tx < 5) tx = 5;
         if (tx + tooltipW > this.canvas.width - 5) tx = this.canvas.width - 5 - tooltipW;
-        if (ty < 5) ty = y + 12; // place below dot if it clips top of canvas
+        if (ty < 5) ty = (labelBox ? labelBox.y + labelBox.h : y) + 12; // place below if it clips top of canvas
         
-        // Draw tooltip background (rounded rect)
-        ctx.fillStyle = 'rgba(15, 23, 42, 0.95)'; // dark tailwind slate-900 equivalent
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
-        ctx.lineWidth = 1;
+        // Draw tooltip background (rounded rect) with subtle shadow
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.55)';
+        ctx.shadowBlur = 8;
+        ctx.shadowOffsetY = 2;
+
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.95)';
+        ctx.strokeStyle = 'rgba(56, 189, 248, 0.75)';
+        ctx.lineWidth = 1.2;
         
         ctx.beginPath();
         if (ctx.roundRect) {
@@ -743,12 +814,14 @@ export class SideView {
         ctx.stroke();
         
         // Draw text
+        ctx.shadowColor = 'transparent';
         ctx.fillStyle = '#ffffff';
         ctx.textAlign = 'left';
         ctx.textBaseline = 'middle';
         ctx.fillText(text, tx + paddingH, ty + tooltipH / 2);
         ctx.restore();
     }
+
 
     roundRect(ctx, x, y, width, height, radius) {
         ctx.moveTo(x + radius, y);

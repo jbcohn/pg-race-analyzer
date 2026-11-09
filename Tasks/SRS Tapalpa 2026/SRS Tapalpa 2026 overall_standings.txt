@@ -1,0 +1,109 @@
+1	0040	Matthijs Groeneveld
+2	1575	Andres Tello Alvarado
+3	1667	Chaeden Luebberke
+4	1481	Estefano Salgado
+5	1593	Lynsey Haynes
+5	0002	Luke Nicol
+7	1734	Michael Sigel
+8	1717	Travis Kool
+9	1574	Bill Belcourt
+10	1750	Salvador Diaz Arriaga
+11	1579	Rodrigo De Obeso
+12	1328	Albert Nazander
+13	0007	Ulric Jessop
+14	1038	Oliver Thurman
+15	0052	Szilard Forgo
+16	0046	Jk Smith
+17	1735	Gavin Mcclurg
+18	1468	Vincent Griffith
+19	0103	Boon Ong
+20	0055	Adrian Acosta
+21	1669	Flavio Lyszkowski Pinheiro
+22	1086	Angel Rivera
+23	1592	Alberto Martinez Brun
+24	0036	Zoltan Fordos
+25	0187	Sebastian Garcia Oyanguren
+26	1073	Ross Desmond
+27	0005	Brett Janaway
+28	0027	Summer Barham
+29	0010	Riley Ferre
+30	0001	Pal Takats
+31	0101	Arnold Castro
+32	0053	Hector Valdes
+33	0020	Didier De Saint Etienne
+34	0086	Korey Curtis
+34	1144	Yury Mishanin
+36	1679	Benjamin Silva Cuevas
+37	0044	Louis Coulombe
+38	0019	Magdalena Janaway
+39	0015	Aurelijus Andreliunas
+40	1736	Torsten Siegel
+40	1143	Cesar Dario Arevalo Urrego
+42	1748	Celia Viermann
+43	1040	Junio Cesar Da Silva Rodrigues
+44	0082	Mike Ravelli
+45	1680	Tiago Cassiano Fortuna Menezes
+46	0209	Stephen Noble
+47	1341	Pierre Savard
+48	0106	Philipp Langenegger
+49	0125	Yann Gallin
+50	0236	Luis Pol Bernal
+50	1357	Eric Bader
+52	1150	Thomas Milko
+53	1698	Enes Mentese
+54	0098	Jason Gore
+55	1154	Julia Menzel
+56	0201	Wade Lippincott
+57	1661	Juan Felipe Karam Partida
+58	0175	Jan Rindlisbacher
+59	1677	Sebastian Rodriguez Romero
+60	1009	Luis Rosenkjer
+61	0138	Lukas Gafner
+62	1497	Adrian J Garza Sada
+63	1597	Patrick Cannon
+64	1229	Cristiano Rossa Model
+65	1065	Carlos Longoria
+66	1585	Jonathan Arriaga
+67	0156	Manuel Lozada
+68	1539	Grant Foad
+69	0126	Juan Camilo Zuluaga Giraldo
+70	1127	Patti Mayfield
+71	0277	Shauin Kao
+72	0145	Iain Douglas
+73	1681	Adolfo Toledo
+74	0278	Fabio Potenza
+75	1684	Alberto Kawakami
+76	0041	Rasa Grigoraitiene
+77	1591	Brian Duffy
+78	1119	Andrew Rayhill
+79	0118	Michael Graef
+80	1581	Mike Brown
+81	0182	Eduardo Mendez
+82	1055	Evan Furbeyre
+83	0060	Marcin Krawczyk
+84	0008	Dustin Pachura
+85	0256	Xinwei Zheng
+86	1151	Deonir Spancerski
+87	1694	Tom Zhou
+88	1206	Mark Simpson
+89	1709	Manuel Quintanilla
+90	1081	Mike Steed
+91	1576	Luis Flores Garza
+92	1706	Jon Gleason
+93	0094	Fermin Montaner Morant
+94	0165	Yemerson Agudelo
+95	1049	Steven Young
+96	0232	Abel Varga
+97	1409	Chad Uchino
+98	1454	Xinling Yuan
+99	0173	Michael Vergalla
+100	0216	Jeff Sinason
+101	1172	Martin Bastow
+102	0065	Lucas Dubinski
+102	0144	Jarotron Krupa
+102	0204	William Corchado
+102	0275	Andria Lea Monteleone
+102	0302	Monika Takats
+102	1584	Pamela Diez
+102	1721	Jose Henrique Herrera
+102	1751	Andres Cantu
