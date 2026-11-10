@@ -1,0 +1,11 @@
+Task 2
+2026-11-09
+Race 41.30 Km
+Official Result
+id 		Radius 	Dist. 	Description
+D01 	launch 	400 m 	0.00 Km 	D01
+A05 	SS 	6.0 Km 	0.10 Km 	A05
+B04 		4.0 Km 	5.70 Km 	B04
+B42 		29.0 Km 	22.50 Km 	B42
+A03 	goal 	200 m 	41.30 Km 	A03
+Startgate: 	13:30:00

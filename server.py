@@ -307,8 +307,12 @@ def parse_task_overall_html(overall_html, fallback_task_name="Task 1", fallback_
 
         # 3. Pilot results table: Rank / # | ID | Name | ... | Start | Finish
         elif ("rank" in header or "#" in header) and "name" in header:
-            # Check for elevated goal / height penalty pattern (Height and Ht Pn columns)
-            if "height" in header and any("ht" in h and "p" in h for h in header):
+            # Check for elevated goal / height penalty pattern (Height + Ht Pn / Low P / Alt Goal columns)
+            if "height" in header and (
+                any("ht" in h and "p" in h for h in header)
+                or any("low" in h and "p" in h for h in header)
+                or "alt goal" in header
+            ):
                 elevated_goal_height = 100
 
             rank_idx = header.index("rank") if "rank" in header else header.index("#")

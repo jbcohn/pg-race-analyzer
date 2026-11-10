@@ -569,7 +569,7 @@ async function loadOverallStandingsForTask(taskId, customPath) {
             }
         });
         console.log(`Successfully loaded overall standings (${standingsFile}) for`, Object.keys(state.overallStandings).length, 'pilots');
-        if (/Ht\s*Pn|Height\s*Pn/i.test(text)) {
+        if (/Ht\s*Pn|Height\s*Pn|Low\s*P|Alt\s*Goal/i.test(text)) {
             state.elevatedGoalEnabled = true;
             if (!state.elevatedGoalHeight) state.elevatedGoalHeight = 100;
             syncElevatedGoalUI();
@@ -1183,9 +1183,62 @@ function initAddRaceModal() {
     const compInput = document.getElementById('input-airtribune-comp');
     const forceChk = document.getElementById('chk-airtribune-force');
     const statusBox = document.getElementById('airtribune-import-status');
+    const serverBanner = document.getElementById('airtribune-server-banner');
     const manualTaskTextarea = document.getElementById('manual-task-textarea');
     const mainTaskTextarea = document.getElementById('task-textarea');
     const manualDrawBtn = document.getElementById('btn-manual-draw-task');
+    const directCupInput = document.getElementById('input-direct-cup-url');
+    const directZipInput = document.getElementById('input-direct-zip-url');
+    const directFetchBtn = document.getElementById('btn-fetch-direct-urls');
+    const directStatusBox = document.getElementById('direct-load-status');
+
+    function getApiBaseCandidates() {
+        const bases = [''];
+        if (window.location.protocol !== 'https:' && !['localhost', '127.0.0.1'].includes(window.location.hostname)) {
+            bases.push('http://localhost:8000');
+        } else if (window.location.protocol !== 'https:' && window.location.port !== '8000') {
+            bases.push('http://localhost:8000');
+        }
+        return bases;
+    }
+
+    async function checkLocalServerBanner() {
+        if (!serverBanner) return;
+        const isStaticHttps = window.location.protocol === 'https:';
+        let connectedBase = null;
+        for (const base of getApiBaseCandidates()) {
+            try {
+                const resp = await fetch(`${base}/api/status`);
+                const ct = resp.headers.get('content-type') || '';
+                if (resp.ok && ct.includes('application/json')) {
+                    const data = await resp.json();
+                    if (data && data.ok) {
+                        connectedBase = base;
+                        break;
+                    }
+                }
+            } catch (e) {}
+        }
+
+        serverBanner.style.display = 'block';
+        if (connectedBase !== null) {
+            serverBanner.style.background = 'rgba(34, 197, 94, 0.12)';
+            serverBanner.style.border = '1px solid rgba(34, 197, 94, 0.4)';
+            serverBanner.innerHTML = `<span style="color: #4ade80; font-weight: 600;">✓ Local server connected</span> — imports will save directly into <code>Tasks/</code> and <code>manifest.json</code>.`;
+        } else {
+            serverBanner.style.background = 'rgba(245, 158, 11, 0.12)';
+            serverBanner.style.border = '1px solid rgba(245, 158, 11, 0.4)';
+            serverBanner.innerHTML = `
+                <div style="color: #fbbf24; font-weight: 600; margin-bottom: 2px;">
+                    ${isStaticHttps ? 'Static GitHub Pages Mode' : 'Local Importer Offline'}
+                </div>
+                <div style="color: var(--text-muted);">
+                    Saving permanently into <code>Tasks/</code> requires running <code>python3 server.py</code> locally and opening <code>http://localhost:8000</code>.
+                    To load a race right here without a server, use <b>Load Directly in Browser</b> below.
+                </div>
+            `;
+        }
+    }
 
     function openAddRace() {
         if (settingsModal) settingsModal.classList.add('hidden');
@@ -1193,6 +1246,7 @@ function initAddRaceModal() {
         if (manualTaskTextarea && mainTaskTextarea && !manualTaskTextarea.value) {
             manualTaskTextarea.value = mainTaskTextarea.value;
         }
+        checkLocalServerBanner();
     }
 
     if (openBtn) openBtn.addEventListener('click', openAddRace);
@@ -1249,7 +1303,7 @@ function initAddRaceModal() {
             }
 
             const payload = JSON.stringify({ url, compName, force });
-            const endpoints = ['/api/import-airtribune', 'http://localhost:8000/api/import-airtribune'];
+            const endpoints = getApiBaseCandidates().map(b => `${b}/api/import-airtribune`);
             let lastErr = null;
             let data = null;
 
@@ -1262,7 +1316,7 @@ function initAddRaceModal() {
                     });
                     const contentType = resp.headers.get('content-type') || '';
                     if (!contentType.includes('application/json')) {
-                        throw new Error('Local server API not active on this port');
+                        throw new Error('Local server API not active on this host');
                     }
                     const json = await resp.json();
                     if (!resp.ok || !json.ok) {
@@ -1281,10 +1335,14 @@ function initAddRaceModal() {
             if (!data) {
                 if (statusBox) {
                     statusBox.style.borderColor = 'var(--danger)';
+                    const isStatic = window.location.protocol === 'https:';
                     statusBox.innerHTML = `
-                        <div style="color: #fca5a5; font-weight: 600; margin-bottom: 4px;">Could not reach local importer: ${lastErr ? lastErr.message : 'Unknown error'}</div>
+                        <div style="color: #fca5a5; font-weight: 600; margin-bottom: 4px;">
+                            ${isStatic ? 'Automatic saving requires the local server' : `Could not reach local importer: ${lastErr ? lastErr.message : 'Unknown error'}`}
+                        </div>
                         <div style="color: var(--text-muted); font-size: 0.74rem;">
-                            Make sure the local server is running: <code>python3 server.py</code> (or run <code>python3 server.py --import "${url}"</code> in terminal), or use the Manual Upload section below.
+                            To save permanently to <code>Tasks/</code>, run <code>python3 server.py</code> locally and open <code>http://localhost:8000</code> (or run <code>python3 server.py --import "${url}"</code> in terminal).<br>
+                            On GitHub Pages, use <b>Load Directly in Browser</b> below to fetch <code>.cup</code> / <code>.zip</code> CDN links or upload files.
                         </div>
                     `;
                 }
@@ -1301,6 +1359,86 @@ function initAddRaceModal() {
 
             // Refresh manifest dropdowns and automatically load the newly imported task
             await setupPredefinedTasks(newestTask ? newestTask.id : null);
+        });
+    }
+
+    if (directFetchBtn) {
+        directFetchBtn.addEventListener('click', async () => {
+            const cupUrl = directCupInput ? directCupInput.value.trim() : '';
+            const zipUrl = directZipInput ? directZipInput.value.trim() : '';
+            if (!cupUrl && !zipUrl) {
+                if (directStatusBox) {
+                    directStatusBox.style.display = 'block';
+                    directStatusBox.style.color = '#fca5a5';
+                    directStatusBox.textContent = 'Paste at least a .cup waypoints URL or a .zip tracklogs URL.';
+                }
+                return;
+            }
+
+            directFetchBtn.disabled = true;
+            const origLabel = directFetchBtn.textContent;
+            directFetchBtn.textContent = '⏳ Fetching...';
+            if (directStatusBox) {
+                directStatusBox.style.display = 'block';
+                directStatusBox.style.color = 'var(--text-muted)';
+                directStatusBox.textContent = 'Downloading from Airtribune CDN...';
+            }
+
+            try {
+                resetPredefinedTaskSelect();
+                let wptCount = 0;
+                if (cupUrl) {
+                    const wptRes = await fetch(cupUrl);
+                    if (!wptRes.ok) throw new Error(`Waypoints fetch failed (HTTP ${wptRes.status})`);
+                    const wptText = await wptRes.text();
+                    const fname = cupUrl.split('/').pop().split('?')[0] || 'waypoints.cup';
+                    const newWpts = parseWaypointFile(wptText, fname);
+                    wptCount = Object.keys(newWpts).length;
+                    Object.assign(state.waypoints, newWpts);
+                    try { localStorage.setItem('pg-waypoints', JSON.stringify(state.waypoints)); } catch (err) {}
+                }
+
+                let trackEntries = [];
+                if (zipUrl) {
+                    if (directStatusBox) directStatusBox.textContent = 'Downloading & extracting IGC .zip archive...';
+                    const zipRes = await fetch(zipUrl);
+                    if (!zipRes.ok) throw new Error(`Tracklogs zip fetch failed (HTTP ${zipRes.status})`);
+                    const buf = await zipRes.arrayBuffer();
+                    trackEntries = await extractTextFilesFromZip(buf);
+                }
+
+                if (manualTaskTextarea && manualTaskTextarea.value.trim() && mainTaskTextarea) {
+                    mainTaskTextarea.value = manualTaskTextarea.value;
+                    drawTask();
+                }
+
+                if (trackEntries.length > 0) {
+                    if (addRaceModal) addRaceModal.classList.add('hidden');
+                    const loadedCount = await loadTrackEntries(trackEntries);
+                    if (directStatusBox) {
+                        directStatusBox.style.color = '#4ade80';
+                        directStatusBox.textContent = `✓ Loaded ${wptCount ? wptCount + ' waypoints and ' : ''}${loadedCount} track(s).`;
+                    }
+                } else {
+                    if (directStatusBox) {
+                        directStatusBox.style.color = '#4ade80';
+                        directStatusBox.textContent = `✓ Loaded ${wptCount} waypoint(s).`;
+                    }
+                    if (addRaceModal && manualTaskTextarea && manualTaskTextarea.value.trim()) {
+                        addRaceModal.classList.add('hidden');
+                    }
+                }
+            } catch (err) {
+                console.error('Direct CDN fetch error:', err);
+                if (directStatusBox) {
+                    directStatusBox.style.display = 'block';
+                    directStatusBox.style.color = '#fca5a5';
+                    directStatusBox.textContent = `Could not fetch link directly (${err.message}). If blocked by CORS, download the file and use buttons 1 & 2 above.`;
+                }
+            } finally {
+                directFetchBtn.disabled = false;
+                directFetchBtn.textContent = origLabel;
+            }
         });
     }
 }
@@ -1379,7 +1517,7 @@ function drawTask() {
         console.log(`Extracted ${Object.keys(embeddedWaypoints).length} waypoints from task definition`);
     }
 
-    if (/Ht\s*Pn|Height\s*Pn|Elevated\s*Goal/i.test(text)) {
+    if (/Ht\s*Pn|Height\s*Pn|Low\s*P|Alt\s*Goal|Elevated\s*Goal/i.test(text)) {
         state.elevatedGoalEnabled = true;
         if (!state.elevatedGoalHeight) state.elevatedGoalHeight = 100;
         syncElevatedGoalUI();
@@ -2175,52 +2313,18 @@ async function extractTextFilesFromZip(arrayBuffer) {
     return results;
 }
 
-async function handleFileUpload(e) {
-    resetPredefinedTaskSelect();
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
-
-    // Close modals immediately so progress bar is visible floating on the page
-    const modal = document.getElementById('settings-modal');
-    if (modal) modal.classList.add('hidden');
-    const addRaceModal = document.getElementById('add-race-modal');
-    if (addRaceModal) addRaceModal.classList.add('hidden');
-
+/**
+ * Parse and load virtual { name, content } track entries with progress UI feedback.
+ */
+async function loadTrackEntries(trackEntries) {
     const loader = document.getElementById('track-loader');
     const fill = document.getElementById('loader-bar-fill');
     const text = document.getElementById('track-loader-text');
 
     if (loader) {
         loader.classList.remove('hidden');
-        if (text) text.textContent = `Preparing to load ${files.length} file(s)...`;
+        if (text) text.textContent = `Loading ${trackEntries.length} track(s)...`;
         if (fill) fill.style.width = '0%';
-    }
-
-    // Yield thread to let modal close and loader render
-    await new Promise(resolve => setTimeout(resolve, 100));
-
-    // Expand any .zip archives into virtual { name, content } items
-    const trackEntries = [];
-    for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        if (file.name.toLowerCase().endsWith('.zip')) {
-            if (text) text.textContent = `Extracting ${file.name}...`;
-            await new Promise(resolve => setTimeout(resolve, 20));
-            try {
-                const buf = await file.arrayBuffer();
-                const extracted = await extractTextFilesFromZip(buf);
-                trackEntries.push(...extracted);
-            } catch (zipErr) {
-                console.error(`Error extracting zip ${file.name}:`, zipErr);
-            }
-        } else {
-            try {
-                const content = await file.text();
-                trackEntries.push({ name: file.name, content });
-            } catch (readErr) {
-                console.error(`Error reading file ${file.name}:`, readErr);
-            }
-        }
     }
 
     let successfulCount = 0;
@@ -2275,6 +2379,58 @@ async function handleFileUpload(e) {
 
     if (loader) loader.classList.add('hidden');
     onAllFilesLoaded();
+    return successfulCount;
+}
+
+async function handleFileUpload(e) {
+    resetPredefinedTaskSelect();
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    // Close modals immediately so progress bar is visible floating on the page
+    const modal = document.getElementById('settings-modal');
+    if (modal) modal.classList.add('hidden');
+    const addRaceModal = document.getElementById('add-race-modal');
+    if (addRaceModal) addRaceModal.classList.add('hidden');
+
+    const loader = document.getElementById('track-loader');
+    const fill = document.getElementById('loader-bar-fill');
+    const text = document.getElementById('track-loader-text');
+
+    if (loader) {
+        loader.classList.remove('hidden');
+        if (text) text.textContent = `Preparing to load ${files.length} file(s)...`;
+        if (fill) fill.style.width = '0%';
+    }
+
+    // Yield thread to let modal close and loader render
+    await new Promise(resolve => setTimeout(resolve, 100));
+
+    // Expand any .zip archives into virtual { name, content } items
+    const trackEntries = [];
+    for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        if (file.name.toLowerCase().endsWith('.zip')) {
+            if (text) text.textContent = `Extracting ${file.name}...`;
+            await new Promise(resolve => setTimeout(resolve, 20));
+            try {
+                const buf = await file.arrayBuffer();
+                const extracted = await extractTextFilesFromZip(buf);
+                trackEntries.push(...extracted);
+            } catch (zipErr) {
+                console.error(`Error extracting zip ${file.name}:`, zipErr);
+            }
+        } else {
+            try {
+                const content = await file.text();
+                trackEntries.push({ name: file.name, content });
+            } catch (readErr) {
+                console.error(`Error reading file ${file.name}:`, readErr);
+            }
+        }
+    }
+
+    await loadTrackEntries(trackEntries);
 
     // Reset file input
     e.target.value = '';
